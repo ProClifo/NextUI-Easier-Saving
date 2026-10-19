@@ -7,10 +7,35 @@ A NextUI tool pak that makes saving simpler. Each change can be turned on or off
 | **Hide Save & Load** | Removes Save and Load from the in-game menu. |
 | **Save & Quit** | Quit becomes Save & Quit. It saves to the current save state slot, then quits. |
 | **Quicksave to Slot** | The quicksave made when the device sleeps or powers off mid-game goes to the current save state slot, not NextUI's hidden quicksave slot. Auto-resume on the next boot loads that slot. |
-| **A Resumes** | In the game list, A resumes a game that has a save state and X starts it fresh. The button hints change to match. Games without a save state still start with A. |
+| **Always Resume** | In the game list, A resumes a game that has a save state, the same as X. This includes games stored as `.cue`/`.m3u` folders. Games without a save state still start with A. |
 | **Reset in Menu** | Adds Reset to the in-game menu. |
 
-With all options on, the in-game menu is **Continue / Options / Reset / Save & Quit**. Each game then has one save that is always kept up to date, and A picks up where you left off.
+With all options on, the in-game menu is **Continue / Options / Reset / Save & Quit**. Each game then has one save that is always kept up to date, and every way of opening the game picks up where you left off. The only way to start over is **Reset** in the in-game menu.
+
+### "Always save, always resume"
+
+To get that behavior, turn on **Save & Quit**, **Quicksave to Slot** and **Always Resume** (plus **Hide Save & Load** and **Reset in Menu** for the simplified menu). With those on:
+
+| Way out of a game | Saves to the current slot? |
+|---|---|
+| Save & Quit in the menu | Yes |
+| Power off (hold power, or Options → Quicksave) | Yes |
+| Sleep, including auto-sleep and sleep that turns into power-off | Yes |
+| Game Switcher (MENU + SELECT, or its shortcut) | Yes (stock NextUI already does this) |
+| Save & Quit shortcut | Yes (stock) |
+| Plugging/unplugging HDMI (minarch restarts) | Yes |
+| The game itself asks to exit (rare, eg. quitting a DOS game) | No. Resuming the moment it exited would just exit again, so the previous save is kept. |
+| Battery dies or power is cut | No. Nothing can run at that point, so you resume from the last sleep or save. |
+
+| Way into a game | Resumes? |
+|---|---|
+| A or X in the game list, collections, Recently Played | Yes |
+| Game Switcher | Yes (stock) |
+| Auto-resume after power-off | Yes, from the slot the quicksave went to |
+
+Turning on only some of these options leaves gaps. For example, with Quicksave to Slot off, a power-off save goes to the hidden slot, and opening the game later from the list resumes the older regular save.
+
+Two things can still put a game somewhere other than where you left off. A **Reset Game** or **Load State** shortcut you bound yourself in Options → Shortcuts (both are unbound by default). And **RetroAchievements Hardcore mode**, which blocks save states completely.
 
 > "Current save state slot" means the slot shown in the Save/Load slot picker. It is slot 1 unless you pick another one. If Save & Load are hidden, it stays on whichever slot you used last.
 

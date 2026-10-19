@@ -26,7 +26,7 @@ enum {
 	ROW_HIDE_SAVE_LOAD,
 	ROW_SAVE_AND_QUIT,
 	ROW_QUICKSAVE_TO_SLOT,
-	ROW_A_RESUMES,
+	ROW_ALWAYS_RESUME,
 	ROW_MENU_RESET,
 	ROW_COUNT,
 };
@@ -42,7 +42,7 @@ static Row rows[ROW_COUNT] = {
 	[ROW_HIDE_SAVE_LOAD]    = {"Hide Save & Load",    "Remove Save and Load from the in-game menu.", ES_HIDE_SAVE_LOAD},
 	[ROW_SAVE_AND_QUIT]     = {"Save & Quit",         "Quit becomes Save & Quit, saving to\nthe current save state slot first.", ES_SAVE_AND_QUIT},
 	[ROW_QUICKSAVE_TO_SLOT] = {"Quicksave to Slot",   "The sleep/power off quicksave goes to the\ncurrent save state slot, not a hidden one.", ES_QUICKSAVE_TO_SLOT},
-	[ROW_A_RESUMES]         = {"A Resumes",           "A resumes games that have a save state.\nX starts them fresh instead.", ES_A_RESUMES},
+	[ROW_ALWAYS_RESUME]     = {"Always Resume",       "A resumes games that have a save state,\nthe same as X. Use Reset to start over.", ES_ALWAYS_RESUME},
 	[ROW_MENU_RESET]        = {"Reset in Menu",       "Add Reset to the in-game menu.", ES_MENU_RESET},
 };
 

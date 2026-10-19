@@ -25,7 +25,7 @@ enum {
 	ES_HIDE_SAVE_LOAD,   // remove Save and Load from the in-game menu
 	ES_SAVE_AND_QUIT,    // Quit becomes Save & Quit
 	ES_QUICKSAVE_TO_SLOT,// sleep/power-off quicksave goes to the current slot
-	ES_A_RESUMES,        // A resumes in the game list (X starts fresh)
+	ES_ALWAYS_RESUME,    // A resumes in the game list, like X
 	ES_MENU_RESET,       // add Reset to the in-game menu
 	ES_COUNT,
 };
@@ -34,7 +34,7 @@ static const char* ES_keys[ES_COUNT] = {
 	[ES_HIDE_SAVE_LOAD]    = "hide_save_load",
 	[ES_SAVE_AND_QUIT]     = "save_and_quit",
 	[ES_QUICKSAVE_TO_SLOT] = "quicksave_to_slot",
-	[ES_A_RESUMES]         = "a_resumes",
+	[ES_ALWAYS_RESUME]     = "always_resume",
 	[ES_MENU_RESET]        = "menu_reset",
 };
 
