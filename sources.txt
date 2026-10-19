@@ -4,4 +4,4 @@
 # platform  repository                               ref
 tg5040      https://github.com/LoveRetro/NextUI.git  v6.15.0
 tg5050      https://github.com/LoveRetro/NextUI.git  v6.15.0
-h700        https://github.com/pvaibhav/NextUI.git   h700-rc11
+h700        https://github.com/LoveRetro/NextUI.git  v6.15.0

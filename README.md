@@ -43,12 +43,7 @@ Two things can still put a game somewhere other than where you left off. A **Res
 
 ## Install
 
-1. Download `Easier Saving.zip` from the [releases](../../releases), or from the latest **Build** workflow run. Each device's pak is built for the NextUI release it runs:
-
-   | Platform | NextUI |
-   |---|---|
-   | `tg5040` (TrimUI Smart Pro / Brick), `tg5050` | Official [NextUI](https://github.com/LoveRetro/NextUI) v6.15.0 |
-   | `h700` (Anbernic) | [pvaibhav's H700 fork](https://github.com/pvaibhav/NextUI/releases) 6.14.0-rc11 |
+1. Download `Easier Saving.zip` from the [releases](../../releases), or from the latest **Build** workflow run. It's built for [NextUI](https://github.com/LoveRetro/NextUI) v6.15.0 on every supported device: `tg5040` (TrimUI Smart Pro / Brick), `tg5050` and `h700` (Anbernic).
 
 2. Extract it to the root of your SD card. This adds `Tools/<platform>/Easier Saving.pak`.
 3. On the device, open **Tools → Easier Saving**, set the options, then press **B** to save.
