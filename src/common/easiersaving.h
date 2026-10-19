@@ -27,6 +27,7 @@ enum {
 	ES_QUICKSAVE_TO_SLOT,// sleep/power-off quicksave goes to the current slot
 	ES_ALWAYS_RESUME,    // A resumes in the game list, like X
 	ES_MENU_RESET,       // add Reset to the in-game menu
+	ES_LOW_BATTERY_SAVE, // save to the current slot when the battery runs low
 	ES_COUNT,
 };
 
@@ -36,6 +37,7 @@ static const char* ES_keys[ES_COUNT] = {
 	[ES_QUICKSAVE_TO_SLOT] = "quicksave_to_slot",
 	[ES_ALWAYS_RESUME]     = "always_resume",
 	[ES_MENU_RESET]        = "menu_reset",
+	[ES_LOW_BATTERY_SAVE]  = "low_battery_save",
 };
 
 static int ES_values[ES_COUNT];

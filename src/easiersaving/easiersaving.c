@@ -28,6 +28,7 @@ enum {
 	ROW_QUICKSAVE_TO_SLOT,
 	ROW_ALWAYS_RESUME,
 	ROW_MENU_RESET,
+	ROW_LOW_BATTERY_SAVE,
 	ROW_COUNT,
 };
 
@@ -44,6 +45,7 @@ static Row rows[ROW_COUNT] = {
 	[ROW_QUICKSAVE_TO_SLOT] = {"Quicksave to Slot",   "The sleep/power off quicksave goes to the\ncurrent save state slot, not a hidden one.", ES_QUICKSAVE_TO_SLOT},
 	[ROW_ALWAYS_RESUME]     = {"Always Resume",       "A resumes games that have a save state,\nthe same as X. Use Reset to start over.", ES_ALWAYS_RESUME},
 	[ROW_MENU_RESET]        = {"Reset in Menu",       "Add Reset to the in-game menu.", ES_MENU_RESET},
+	[ROW_LOW_BATTERY_SAVE]  = {"Low Battery Save",    "Save to the current slot at 10% and 5% battery,\nthen every 2 minutes until charging.", ES_LOW_BATTERY_SAVE},
 };
 
 static int enabled = 0;
@@ -79,6 +81,7 @@ int main(int argc, char* argv[]) {
 	int dirty = 1;
 	int show_setting = 0;
 	int selected = 0;
+	int start = 0; // first visible row, the list scrolls on short screens
 
 	while (!quit) {
 		GFX_startFrame();
@@ -137,9 +140,18 @@ int main(int argc, char* argv[]) {
 			int ox = SCALE1(PADDING);
 			int oy = SCALE1(PADDING + PILL_SIZE + PADDING);
 			char* desc = NULL;
-			for (int i=0; i<ROW_COUNT; i++) {
+
+			// leave room for a two line description above the hints
+			int dw, dh;
+			GFX_sizeText(font.tiny, "A\nA", SCALE1(12), &dw, &dh);
+			int max_rows = (screen->h - SCALE1(PADDING + PILL_SIZE) - dh - oy) / SCALE1(BUTTON_SIZE);
+			if (max_rows>ROW_COUNT) max_rows = ROW_COUNT;
+			if (selected<start) start = selected;
+			if (selected>=start+max_rows) start = selected - max_rows + 1;
+
+			for (int i=start; i<start+max_rows; i++) {
 				SDL_Color text_color = COLOR_WHITE;
-				int y = oy + SCALE1(i*BUTTON_SIZE);
+				int y = oy + SCALE1((i-start)*BUTTON_SIZE);
 				// options only matter while the patched binaries are in use
 				int muted = i!=ROW_ENABLED && !enabled;
 

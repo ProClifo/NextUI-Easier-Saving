@@ -9,12 +9,13 @@ A NextUI tool pak that makes saving simpler. Each change can be turned on or off
 | **Quicksave to Slot** | The quicksave made when the device sleeps or powers off mid-game goes to the current save state slot, not NextUI's hidden quicksave slot. Auto-resume on the next boot loads that slot. |
 | **Always Resume** | In the game list, A resumes a game that has a save state, the same as X. This includes games stored as `.cue`/`.m3u` folders. Games without a save state still start with A. |
 | **Reset in Menu** | Adds Reset to the in-game menu. |
+| **Low Battery Save** | While you play on battery, saves to the current slot when the battery reaches 10% and again at 5%, then every 2 minutes until you plug in. A notice ("Low Battery - Saved to Slot N") shows each time. |
 
 With all options on, the in-game menu is **Continue / Options / Reset / Save & Quit**. Each game then has one save that is always kept up to date, and every way of opening the game picks up where you left off. The only way to start over is **Reset** in the in-game menu.
 
 ### "Always save, always resume"
 
-To get that behavior, turn on **Save & Quit**, **Quicksave to Slot** and **Always Resume** (plus **Hide Save & Load** and **Reset in Menu** for the simplified menu). With those on:
+To get that behavior, turn on **Save & Quit**, **Quicksave to Slot**, **Always Resume** and **Low Battery Save** (plus **Hide Save & Load** and **Reset in Menu** for the simplified menu). With those on:
 
 | Way out of a game | Saves to the current slot? |
 |---|---|
@@ -25,7 +26,8 @@ To get that behavior, turn on **Save & Quit**, **Quicksave to Slot** and **Alway
 | Save & Quit shortcut | Yes (stock) |
 | Plugging/unplugging HDMI (minarch restarts) | Yes |
 | The game itself asks to exit (rare, eg. quitting a DOS game) | No. Resuming the moment it exited would just exit again, so the previous save is kept. |
-| Battery dies or power is cut | No. Nothing can run at that point, so you resume from the last sleep or save. |
+| Battery dies | Covered by Low Battery Save. You lose at most the last 2 minutes of play below 5%. |
+| Power is cut suddenly (battery pulled, crash) | No. Nothing can run at that point, so you resume from the last save. |
 
 | Way into a game | Resumes? |
 |---|---|

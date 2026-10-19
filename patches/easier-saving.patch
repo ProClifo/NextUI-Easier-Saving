@@ -1,5 +1,5 @@
 diff --git a/workspace/all/minarch/ma_menu.c b/workspace/all/minarch/ma_menu.c
-index 85ca434..95dc7fa 100644
+index 85ca434..ffe4450 100644
 --- a/workspace/all/minarch/ma_menu.c
 +++ b/workspace/all/minarch/ma_menu.c
 @@ -22,6 +22,7 @@
@@ -79,12 +79,12 @@ index 85ca434..95dc7fa 100644
  	setOverclock(overclock);
  }
  
-@@ -1759,6 +1776,38 @@ void Menu_loadState(void) {
+@@ -1759,6 +1776,77 @@ void Menu_loadState(void) {
  		}
  	}
  }
-+// sleep/power-off quicksave into the current slot instead of the hidden auto slot
-+static void Menu_quicksaveToSlot(void) {
++// save to the current slot without opening the menu (sleep/power-off and low battery)
++static int Menu_saveCurrentSlot(void) {
 +	Menu_updateState();
 +
 +	if (menu.total_discs) {
@@ -112,13 +112,52 @@ index 85ca434..95dc7fa 100644
 +
 +	state_slot = menu.slot;
 +	putInt(menu.slot_path, menu.slot);
-+	State_write();
++	return State_write();
++}
++// sleep/power-off quicksave into the current slot instead of the hidden auto slot
++static void Menu_quicksaveToSlot(void) {
++	Menu_saveCurrentSlot();
 +	putInt(ES_RESUME_SLOT_PATH, menu.slot);
++}
++// called every frame in game: save at 10% and 5% battery, then every 2 minutes until charging
++#define LOW_BATTERY_FIRST 10
++#define LOW_BATTERY_LAST 5
++#define LOW_BATTERY_REPEAT_MS (2 * 60 * 1000)
++void Menu_checkLowBattery(void) {
++	static uint32_t checked_at = 0;
++	static uint32_t saved_at = 0;
++	static int saved_charge = 101; // charge at the last low battery save
++
++	if (!ES_get(ES_LOW_BATTERY_SAVE)) return;
++
++	uint32_t now = SDL_GetTicks();
++	if (checked_at && now - checked_at < 5000) return; // the battery is only polled every few seconds anyway
++	checked_at = now;
++
++	if (PWR_isCharging()) {
++		saved_charge = 101;
++		return;
++	}
++
++	int charge = PWR_getBattery();
++	int due = (charge <= LOW_BATTERY_FIRST && saved_charge > LOW_BATTERY_FIRST)
++	       || (charge <= LOW_BATTERY_LAST && saved_charge > LOW_BATTERY_LAST)
++	       || (charge <= LOW_BATTERY_LAST && now - saved_at >= LOW_BATTERY_REPEAT_MS);
++	if (!due || RA_isHardcoreModeActive()) return;
++
++	saved_charge = charge;
++	saved_at = now;
++	LOG_info("low battery (%i%%), saving to slot %i\n", charge, menu.slot);
++	int success = Menu_saveCurrentSlot();
++
++	char msg[NOTIFICATION_MAX_MESSAGE];
++	snprintf(msg, sizeof(msg), success ? "Low Battery - Saved to Slot %d" : "Low Battery - Save Failed", menu.slot + 1);
++	Notification_push(NOTIFICATION_SAVE_STATE, msg, NULL);
 +}
  
  void Menu_loop(void) {
  
-@@ -1817,7 +1866,8 @@ void Menu_loop(void) {
+@@ -1817,7 +1905,8 @@ void Menu_loop(void) {
  		sprintf(disc_name, "Disc %i", menu.disc+1);
  	}
  		
@@ -128,7 +167,7 @@ index 85ca434..95dc7fa 100644
  	Menu_initState();
  	
  	int status = STATUS_CONT; // TODO: no longer used?
-@@ -1836,44 +1886,46 @@ void Menu_loop(void) {
+@@ -1836,44 +1925,46 @@ void Menu_loop(void) {
  
  		PAD_poll();
  		
@@ -182,7 +221,7 @@ index 85ca434..95dc7fa 100644
  			Menu_updateState();
  		}
  		
-@@ -1882,7 +1934,7 @@ void Menu_loop(void) {
+@@ -1882,7 +1973,7 @@ void Menu_loop(void) {
  			show_menu = 0;
  		}
  		else if (PAD_justPressed(BTN_A)) {
@@ -191,7 +230,7 @@ index 85ca434..95dc7fa 100644
  				case ITEM_CONT:
  				if (menu.total_discs && rom_disc!=menu.disc) {
  						status = STATUS_DISC;
-@@ -1931,7 +1983,13 @@ void Menu_loop(void) {
+@@ -1931,7 +2022,13 @@ void Menu_loop(void) {
  					}
  				}
  				break;
@@ -205,7 +244,7 @@ index 85ca434..95dc7fa 100644
  					status = STATUS_QUIT;
  					show_menu = 0;
  					quit = 1; // TODO: tmp?
-@@ -1979,16 +2037,20 @@ void Menu_loop(void) {
+@@ -1979,16 +2076,20 @@ void Menu_loop(void) {
  			GFX_blitButtonGroup((char*[]){ "B","BACK", "A","OKAY", NULL }, 1, screen, 1);
  			
  			// list
@@ -230,7 +269,7 @@ index 85ca434..95dc7fa 100644
  						GFX_blitPillDark(ASSET_WHITE_PILL, screen, &(SDL_Rect){
  							SCALE1(PADDING),
  							SCALE1(oy + PADDING),
-@@ -2003,13 +2065,13 @@ void Menu_loop(void) {
+@@ -2003,13 +2104,13 @@ void Menu_loop(void) {
  						SDL_FreeSurface(text);
  					}
  					
@@ -246,7 +285,7 @@ index 85ca434..95dc7fa 100644
  						ow,
  						SCALE1(PILL_SIZE)
  					});
-@@ -2017,16 +2079,16 @@ void Menu_loop(void) {
+@@ -2017,16 +2118,16 @@ void Menu_loop(void) {
  			
  				
  				// text
@@ -266,7 +305,7 @@ index 85ca434..95dc7fa 100644
  				#define WINDOW_RADIUS 4 // TODO: this logic belongs in blitRect?
  				#define PAGINATION_HEIGHT 6
  				// unscaled
-@@ -2083,6 +2145,7 @@ void Menu_loop(void) {
+@@ -2083,6 +2184,7 @@ void Menu_loop(void) {
  	
  	SDL_FreeSurface(preview);
  	if(menu.bitmap) SDL_FreeSurface(menu.bitmap);
@@ -274,6 +313,15 @@ index 85ca434..95dc7fa 100644
  	PAD_reset();
  
  	GFX_clearAll();
+diff --git a/workspace/all/minarch/ma_menu.h b/workspace/all/minarch/ma_menu.h
+index 749a81b..960b7f4 100644
+--- a/workspace/all/minarch/ma_menu.h
++++ b/workspace/all/minarch/ma_menu.h
+@@ -20,3 +20,4 @@ void Menu_initState(void);
+ void Menu_loop(void);
+ void Menu_setCoreVersionDesc(const char* version);
+ void Menu_waitScreenshot(void);
++void Menu_checkLowBattery(void);
 diff --git a/workspace/all/minarch/ma_saves.c b/workspace/all/minarch/ma_saves.c
 index 8fe053e..2b0c33b 100644
 --- a/workspace/all/minarch/ma_saves.c
@@ -303,6 +351,18 @@ index 8fe053e..2b0c33b 100644
  	State_read();
  	state_slot = last_state_slot;
  	Rewind_on_state_change();
+diff --git a/workspace/all/minarch/minarch.c b/workspace/all/minarch/minarch.c
+index 82b5d4c..e3b722a 100644
+--- a/workspace/all/minarch/minarch.c
++++ b/workspace/all/minarch/minarch.c
+@@ -269,6 +269,7 @@ int main(int argc , char* argv[]) {
+ 		GFX_startFrame();
+ 
+ 		run_frame();
++		Menu_checkLowBattery();
+ 		
+ 		// Process RetroAchievements for this frame
+ 		RA_doFrame();
 diff --git a/workspace/all/nextui/nextui.c b/workspace/all/nextui/nextui.c
 index 90c5673..8f6fc08 100644
 --- a/workspace/all/nextui/nextui.c
