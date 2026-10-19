@@ -27,6 +27,9 @@ jobs:
 
       - name: Build ${{ matrix.platform }}
         run: ./scripts/build.sh ${{ matrix.platform }}
+        env:
+          # releases report their tag, everything else dev-<commit>
+          PAK_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
 
       - name: Upload
         uses: actions/upload-artifact@v4
@@ -51,6 +54,23 @@ jobs:
           find stage -name '*.sh' -o -name '*.elf' | xargs -d '\n' chmod +x
           (cd stage && zip -r -X "../dist/Easier Saving.zip" Tools)
 
+      # what update.sh on the device downloads: one archive per platform plus
+      # latest.txt with each archive's checksum and the NextUI it was built for
+      - name: Update archives
+        run: |
+          set -e
+          version=""
+          for pak in stage/Tools/*/"Easier Saving.pak"; do
+            platform="$(basename "$(dirname "$pak")")"
+            version="$(cat "$pak/version.txt")"
+            tar -czf "dist/easier-saving-$platform.tar.gz" -C "$pak" .
+            sha="$(sha256sum "dist/easier-saving-$platform.tar.gz" | cut -d' ' -f1)"
+            echo "$platform $sha $(cat "$pak/nextui-commit.txt")" >> dist/platforms.txt
+          done
+          { echo "version $version"; cat dist/platforms.txt; } > dist/latest.txt
+          rm dist/platforms.txt
+          cat dist/latest.txt
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
@@ -61,5 +81,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/Easier Saving.zip
+          files: |
+            dist/Easier Saving.zip
+            dist/easier-saving-*.tar.gz
+            dist/latest.txt
           generate_release_notes: true

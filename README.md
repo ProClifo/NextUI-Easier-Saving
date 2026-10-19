@@ -48,6 +48,15 @@ Two things can still put a game somewhere other than where you left off. A **Res
 2. Extract it to the root of your SD card. This adds `Tools/<platform>/Easier Saving.pak`.
 3. On the device, open **Tools → Easier Saving**, set the options, then press **B** to save.
 
+## Updates
+
+Opening the pak checks GitHub for a newer release in the background ("Checking for updates..." in the title) when the device is on Wi-Fi. If there is one, an **Update Available** row shows up at the top of the list. Press **A** on it to download the update. The pak then installs it and restarts, keeping your settings.
+
+- Downloads come from this repo's [releases](../../releases) over HTTPS, verified against a CA bundle shipped in the pak, and are checked against the SHA-256 in the release's `latest.txt`.
+- An update built for a different NextUI release than the one installed isn't offered; the title shows *vX.Y.Z needs a newer NextUI* instead.
+- Without a connection the check quietly finds nothing.
+- Builds that don't come from a release (`dev-<commit>` in the title) always count as older than the latest release.
+
 ## How it works
 
 Changing NextUI's in-game menu needs a modified `minarch.elf`, and changing the game list needs a modified `nextui.elf`. This pak includes both, built from NextUI's own source with [`patches/easier-saving.patch`](patches/easier-saving.patch) applied.
@@ -66,7 +75,9 @@ Settings are stored in `.userdata/shared/.easiersaving/settings.txt`, and the lo
 ./scripts/build.sh h700          # just one
 ```
 
-The build needs `git` and `docker` (or `podman`). For each platform it clones the NextUI repository and tag listed in `sources.txt`, applies the patch, and compiles inside the official `ghcr.io/loveretro/<platform>-toolchain` images. The output is `dist/Easier Saving.zip`. The GitHub Actions workflow runs the same script on arm64 runners. Pushing a `v*` tag publishes a release.
+The build needs `git` and `docker` (or `podman`). For each platform it clones the NextUI repository and tag listed in `sources.txt`, applies the patch, and compiles inside the official `ghcr.io/loveretro/<platform>-toolchain` images. The output is `dist/Easier Saving.zip`. The GitHub Actions workflow runs the same script on arm64 runners.
+
+Pushing a `v*` tag (eg. `v1.2.0`) publishes a release, and that release is what installed paks update to. Besides `Easier Saving.zip` it carries `easier-saving-<platform>.tar.gz` and `latest.txt`, which `update.sh` on the device reads. Set `PAK_VERSION` to give a local build a version.
 
 ### Updating to a new NextUI release
 
@@ -81,6 +92,6 @@ sources.txt                    NextUI repo/tag each platform is built against
 patches/easier-saving.patch    changes to minarch (in-game menu, quicksave) and nextui (A resumes)
 src/common/easiersaving.h      option storage shared by the patched binaries and the settings tool
 src/easiersaving/              settings tool (easiersaving.elf)
-pak/Easier Saving.pak/         launch.sh + apply.sh (mount/unmount, boot hook, version check)
+pak/Easier Saving.pak/         launch.sh, apply.sh (mount/unmount, boot hook, version check), update.sh (self-update)
 scripts/build.sh               build + package
 ```

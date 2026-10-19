@@ -4,9 +4,10 @@
 # mounted over the stock ones, so nothing on the SD card is overwritten and a
 # reboot with the pak switched off (or deleted) always gets stock NextUI back.
 #
-# usage: apply.sh [check]
+# usage: apply.sh [check | unmount]
 #   check: exit 0 if the installed NextUI matches the version this pak was
 #          built against, 1 otherwise
+#   unmount: put the stock binaries back for now (used before an update)
 #   (none): mount/unmount to match the master switch and keep the boot hook in sync
 #
 # Runs from launch.sh after the settings tool closes, and at boot from the
@@ -82,6 +83,10 @@ install_hook() {
 if [ "$1" = "check" ]; then
 	is_compatible
 	exit $?
+fi
+if [ "$1" = "unmount" ]; then
+	unmount_all
+	exit 0
 fi
 
 if [ -f "$ES_DIR/enabled" ] && [ -d "$BIN_DIR" ]; then

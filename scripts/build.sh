@@ -4,6 +4,9 @@
 #
 # usage: scripts/build.sh [platform...]   (default: every platform in sources.txt)
 #
+# PAK_VERSION sets the version the pak reports and compares against releases
+# when it checks for updates (default: dev-<commit>, older than any release).
+#
 # Needs git, docker (or podman) and network access to pull NextUI, its
 # dependencies and the ghcr.io/loveretro/<platform>-toolchain images.
 # Output: dist/Easier Saving.zip, extract it to the root of the SD card.
@@ -23,6 +26,13 @@ RUNTIME="${CONTAINER_RUNTIME:-$(command -v docker || command -v podman)}"
 
 rm -rf "$STAGE" "$DIST"
 mkdir -p "$BUILD" "$STAGE" "$DIST"
+
+PAK_VERSION="${PAK_VERSION:-dev-$(git -C "$ROOT" rev-parse --short HEAD)}"
+
+# Mozilla's CA list, so update checks can verify HTTPS on devices that ship without one
+if [ ! -f "$BUILD/cacert.pem" ]; then
+	curl -fsSL https://curl.se/ca/cacert.pem -o "$BUILD/cacert.pem"
+fi
 
 for platform in $PLATFORMS; do
 	LINE="$(awk -v p="$platform" '$1==p' "$SOURCES")"
@@ -60,7 +70,8 @@ for platform in $PLATFORMS; do
 
 	PAK="$STAGE/Tools/$platform/$PAK_NAME"
 	mkdir -p "$PAK/bin/$platform"
-	cp "$ROOT/pak/$PAK_NAME/launch.sh" "$ROOT/pak/$PAK_NAME/apply.sh" "$PAK/"
+	cp "$ROOT/pak/$PAK_NAME/launch.sh" "$ROOT/pak/$PAK_NAME/apply.sh" "$ROOT/pak/$PAK_NAME/update.sh" "$BUILD/cacert.pem" "$PAK/"
+	echo "$PAK_VERSION" > "$PAK/version.txt"
 	echo "$NEXTUI_TAG" > "$PAK/nextui-version.txt"
 	echo "$COMMIT" > "$PAK/nextui-commit.txt"
 	cp "$WS/workspace/all/minarch/build/$platform/minarch.elf" \
