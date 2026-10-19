@@ -1,24 +1,18 @@
 #!/bin/sh
 # Builds the patched NextUI binaries plus the settings tool and assembles the
-# pak for each platform of one target in targets.txt.
+# pak for each platform, each from the NextUI source listed in sources.txt.
 #
-# usage: scripts/build.sh <target> [platform...]   (default: the target's platforms)
+# usage: scripts/build.sh [platform...]   (default: every platform in sources.txt)
 #
 # Needs git, docker (or podman) and network access to pull NextUI, its
 # dependencies and the ghcr.io/loveretro/<platform>-toolchain images.
-# Output: dist/Easier Saving (<target>).zip, extract it to the root of the SD card.
+# Output: dist/Easier Saving.zip, extract it to the root of the SD card.
 
 set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TARGET="$1"
-[ -n "$TARGET" ] || { echo "usage: $0 <target> [platform...]" >&2; grep -v '^#' "$ROOT/targets.txt" | awk 'NF {print "  " $1}' >&2; exit 1; }
-shift
-LINE="$(awk -v t="$TARGET" '$1==t' "$ROOT/targets.txt")"
-[ -n "$LINE" ] || { echo "unknown target: $TARGET" >&2; exit 1; }
-NEXTUI_REPO="$(echo "$LINE" | awk '{print $2}')"
-NEXTUI_TAG="$(echo "$LINE" | awk '{print $3}')"
-PLATFORMS="${*:-$(echo "$LINE" | awk '{$1=$2=$3=""; print}' | xargs)}"
+SOURCES="$ROOT/sources.txt"
+PLATFORMS="${*:-$(grep -v '^#' "$SOURCES" | awk 'NF {print $1}' | xargs)}"
 BUILD="$ROOT/build"
 DIST="$ROOT/dist"
 STAGE="$BUILD/stage"
@@ -30,17 +24,22 @@ RUNTIME="${CONTAINER_RUNTIME:-$(command -v docker || command -v podman)}"
 rm -rf "$STAGE" "$DIST"
 mkdir -p "$BUILD" "$STAGE" "$DIST"
 
-# pristine NextUI checkout at the pinned release
-SRC="$BUILD/src-$TARGET"
-if [ ! -d "$SRC" ]; then
-	git clone --depth 1 --branch "$NEXTUI_TAG" "$NEXTUI_REPO" "$SRC"
-fi
-COMMIT="$(git -C "$SRC" rev-parse HEAD)"
-
 for platform in $PLATFORMS; do
-	echo "== $platform"
+	LINE="$(awk -v p="$platform" '$1==p' "$SOURCES")"
+	[ -n "$LINE" ] || { echo "no source for $platform in sources.txt" >&2; exit 1; }
+	NEXTUI_REPO="$(echo "$LINE" | awk '{print $2}')"
+	NEXTUI_TAG="$(echo "$LINE" | awk '{print $3}')"
+	echo "== $platform: $NEXTUI_REPO $NEXTUI_TAG"
+
+	# pristine NextUI checkout at the pinned release
+	SRC="$BUILD/src-$(echo "$NEXTUI_REPO" | tr -c 'A-Za-z0-9' '-')$NEXTUI_TAG"
+	if [ ! -d "$SRC" ]; then
+		git clone --depth 1 --branch "$NEXTUI_TAG" "$NEXTUI_REPO" "$SRC"
+	fi
+	COMMIT="$(git -C "$SRC" rev-parse HEAD)"
+
 	# one tree per platform, minarch's bundled deps don't rebuild cleanly across toolchains
-	WS="$BUILD/$TARGET-$platform"
+	WS="$BUILD/$platform"
 	rm -rf "$WS"
 	cp -R "$SRC" "$WS"
 	git -C "$WS" apply "$ROOT/patches/easier-saving.patch"
@@ -71,6 +70,5 @@ for platform in $PLATFORMS; do
 	chmod +x "$PAK"/*.sh "$PAK/bin/$platform"/*.elf
 done
 
-ZIP="$DIST/Easier Saving ($TARGET).zip"
-(cd "$STAGE" && zip -r -X "$ZIP" Tools)
-echo "built $ZIP (NextUI $NEXTUI_REPO $NEXTUI_TAG, $COMMIT)"
+(cd "$STAGE" && zip -r -X "$DIST/Easier Saving.zip" Tools)
+echo "built $DIST/Easier Saving.zip"

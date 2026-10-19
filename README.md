@@ -43,14 +43,13 @@ Two things can still put a game somewhere other than where you left off. A **Res
 
 ## Install
 
-1. Pick the download that matches the NextUI you have installed. The pak only works on that exact release.
+1. Download `Easier Saving.zip` from the [releases](../../releases), or from the latest **Build** workflow run. Each device's pak is built for the NextUI release it runs:
 
-   | You run | Download |
+   | Platform | NextUI |
    |---|---|
-   | Official [NextUI](https://github.com/LoveRetro/NextUI) v6.15.0 on TrimUI (`tg5040`, `tg5050`) or Anbernic H700 | `Easier Saving (nextui-v6.15.0).zip` |
-   | [pvaibhav's NextUI fork](https://github.com/pvaibhav/NextUI/releases) 6.14.0-rc11 for Anbernic H700 | `Easier Saving (pvaibhav-h700-rc11).zip` |
+   | `tg5040` (TrimUI Smart Pro / Brick), `tg5050` | Official [NextUI](https://github.com/LoveRetro/NextUI) v6.15.0 |
+   | `h700` (Anbernic) | [pvaibhav's H700 fork](https://github.com/pvaibhav/NextUI/releases) 6.14.0-rc11 |
 
-   Get it from the [releases](../../releases), or from the latest **Build** workflow run. The version you have is on the first line of `.system/version.txt` on the SD card.
 2. Extract it to the root of your SD card. This adds `Tools/<platform>/Easier Saving.pak`.
 3. On the device, open **Tools → Easier Saving**, set the options, then press **B** to save.
 
@@ -60,7 +59,7 @@ Changing NextUI's in-game menu needs a modified `minarch.elf`, and changing the 
 
 - **Nothing in `.system` is overwritten.** The patched binaries are bind-mounted over the stock ones. A boot hook (`.userdata/<platform>/.hooks/boot.d/easier-saving.sync.sh`) redoes the mount on every boot.
 - **Turning the pak off** (the *Easier Saving* row) unmounts the binaries and removes the hook, so you get stock NextUI right away. Deleting the pak folder also gets you stock NextUI after the next reboot.
-- **Version-locked.** The binaries only work with the NextUI release they were built from (see [`targets.txt`](targets.txt)). If you install the wrong download, or update NextUI before this pak is rebuilt, it falls back to the stock binaries and the settings screen shows *Needs NextUI &lt;release&gt;*. To skip this check at your own risk, create `.userdata/shared/.easiersaving/skip-version-check`.
+- **Version-locked.** The binaries only work with the NextUI release they were built from (see [`sources.txt`](sources.txt)). If you run a different release, or update NextUI before this pak is rebuilt, it falls back to the stock binaries and the settings screen shows *Needs NextUI &lt;release&gt;*. To skip this check at your own risk, create `.userdata/shared/.easiersaving/skip-version-check`.
 - With an option off, the patched binaries behave exactly like stock for that feature.
 
 Settings are stored in `.userdata/shared/.easiersaving/settings.txt`, and the log is in `.userdata/<platform>/logs/Easier Saving.txt`.
@@ -68,23 +67,22 @@ Settings are stored in `.userdata/shared/.easiersaving/settings.txt`, and the lo
 ## Building
 
 ```sh
-./scripts/build.sh nextui-v6.15.0              # all of a target's platforms
-./scripts/build.sh nextui-v6.15.0 tg5040       # just one
-./scripts/build.sh pvaibhav-h700-rc11
+./scripts/build.sh               # all platforms
+./scripts/build.sh h700          # just one
 ```
 
-The build needs `git` and `docker` (or `podman`). It clones the target's NextUI repository at the tag listed in `targets.txt`, applies the patch, and compiles inside the official `ghcr.io/loveretro/<platform>-toolchain` images. The output is `dist/Easier Saving (<target>).zip`. The GitHub Actions workflow runs the same script on arm64 runners. Pushing a `v*` tag publishes a release.
+The build needs `git` and `docker` (or `podman`). For each platform it clones the NextUI repository and tag listed in `sources.txt`, applies the patch, and compiles inside the official `ghcr.io/loveretro/<platform>-toolchain` images. The output is `dist/Easier Saving.zip`. The GitHub Actions workflow runs the same script on arm64 runners. Pushing a `v*` tag publishes a release.
 
 ### Updating to a new NextUI release
 
-1. Add or update the target in `targets.txt` and in the matrix in `.github/workflows/build.yml`.
+1. Update the platform's line in `sources.txt` (and the matrix in `.github/workflows/build.yml` if you add a platform).
 2. Check that the patch still applies: `git -C <NextUI checkout> apply --check patches/easier-saving.patch`. If it doesn't, apply it by hand to the new tag and regenerate it with `git diff -- workspace/all/minarch workspace/all/nextui > patches/easier-saving.patch`.
 3. Tag a new release.
 
 ### Layout
 
 ```
-targets.txt                    NextUI repos/tags the binaries are built against
+sources.txt                    NextUI repo/tag each platform is built against
 patches/easier-saving.patch    changes to minarch (in-game menu, quicksave) and nextui (A resumes)
 src/common/easiersaving.h      option storage shared by the patched binaries and the settings tool
 src/easiersaving/              settings tool (easiersaving.elf)
