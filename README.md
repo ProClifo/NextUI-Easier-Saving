@@ -8,14 +8,15 @@ A NextUI tool pak that makes saving simpler. Each change can be turned on or off
 | **Save & Quit** | Quit becomes Save & Quit. It saves to the current save state slot, then quits. |
 | **Quicksave to Slot** | The quicksave made when the device sleeps or powers off mid-game goes to the current save state slot, not NextUI's hidden quicksave slot. Auto-resume on the next boot loads that slot. |
 | **Always Resume** | In the game list, A resumes a game that has a save state, the same as X. This includes games stored as `.cue`/`.m3u` folders. Games without a save state still start with A. |
-| **Reset in Menu** | Adds Reset to the in-game menu. It asks "Are you sure you want to reset?" first, with **No** selected, so a stray press can't wipe your progress. |
+| **Reset in In-Game Menu** | Adds Reset to the in-game menu. It asks "Are you sure you want to reset?" first, with **No** selected, so a stray press can't wipe your progress. |
 | **Low Battery Save** | While you play on battery, saves to the current slot when the battery reaches 10% and again at 5%, then every 2 minutes until you plug in. A notice ("Low Battery - Saved to Slot N") shows each time. |
+| **Save Interval** | While you play, saves to the current slot every 10 seconds, 30 seconds, 1, 2, 5, 10 or 30 minutes, or 1 hour. Off by default. Time in the in-game menu doesn't count, and these saves are silent. Short intervals can cause a brief stutter on systems with large save states. |
 
 With all options on, the in-game menu is **Continue / Options / Reset / Save & Quit**. Each game then has one save that is always kept up to date, and every way of opening the game picks up where you left off. The only way to start over is **Reset** in the in-game menu.
 
 ### "Always save, always resume"
 
-To get that behavior, turn on **Save & Quit**, **Quicksave to Slot**, **Always Resume** and **Low Battery Save** (plus **Hide Save & Load** and **Reset in Menu** for the simplified menu). With those on:
+To get that behavior, turn on **Save & Quit**, **Quicksave to Slot**, **Always Resume** and **Low Battery Save** (plus **Hide Save & Load** and **Reset in In-Game Menu** for the simplified menu). With those on:
 
 | Way out of a game | Saves to the current slot? |
 |---|---|

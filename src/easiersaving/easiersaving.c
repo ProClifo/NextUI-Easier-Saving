@@ -35,6 +35,7 @@ enum {
 	ROW_ALWAYS_RESUME,
 	ROW_MENU_RESET,
 	ROW_LOW_BATTERY_SAVE,
+	ROW_SAVE_INTERVAL,
 	ROW_COUNT,
 };
 
@@ -51,8 +52,9 @@ static Row rows[ROW_COUNT] = {
 	[ROW_SAVE_AND_QUIT]     = {"Save & Quit",         "Quit becomes Save & Quit, saving to\nthe current save state slot first.", ES_SAVE_AND_QUIT},
 	[ROW_QUICKSAVE_TO_SLOT] = {"Quicksave to Slot",   "The sleep/power off quicksave goes to the\ncurrent save state slot, not a hidden one.", ES_QUICKSAVE_TO_SLOT},
 	[ROW_ALWAYS_RESUME]     = {"Always Resume",       "A resumes games that have a save state,\nthe same as X. Use Reset to start over.", ES_ALWAYS_RESUME},
-	[ROW_MENU_RESET]        = {"Reset in Menu",       "Add Reset to the in-game menu.", ES_MENU_RESET},
+	[ROW_MENU_RESET]        = {"Reset in In-Game Menu", "Add Reset to the in-game menu.", ES_MENU_RESET},
 	[ROW_LOW_BATTERY_SAVE]  = {"Low Battery Save",    "Save to the current slot at 10% and 5% battery,\nthen every 2 minutes until charging.", ES_LOW_BATTERY_SAVE},
+	[ROW_SAVE_INTERVAL]     = {"Save Interval",       "While playing, save to the current slot this often.\nShorter intervals can cause brief stutters.", ES_SAVE_INTERVAL},
 };
 
 static int enabled = 0;
@@ -60,9 +62,18 @@ static int enabled = 0;
 static int Row_get(int i) {
 	return rows[i].opt<0 ? enabled : ES_get(rows[i].opt);
 }
-static void Row_toggle(int i) {
-	if (rows[i].opt<0) enabled = !enabled;
-	else ES_set(rows[i].opt, !ES_get(rows[i].opt));
+static char* Row_label(int i) {
+	if (rows[i].opt==ES_SAVE_INTERVAL) return (char*)ES_save_interval_labels[Row_get(i)];
+	return Row_get(i) ? "On" : "Off";
+}
+// dir is -1 or +1; on/off rows just flip, multi-value rows step and wrap
+static void Row_change(int i, int dir) {
+	if (rows[i].opt<0) {
+		enabled = !enabled;
+		return;
+	}
+	int count = ES_max(rows[i].opt) + 1;
+	ES_set(rows[i].opt, (ES_get(rows[i].opt) + dir + count) % count);
 }
 
 ///////////////////////////////
@@ -136,8 +147,10 @@ int main(int argc, char* argv[]) {
 		ES_load();
 		enabled = exists(ES_ENABLED_PATH);
 	}
-	else { // first run, start with everything on (nothing is applied until B)
-		for (int i=0; i<ES_COUNT; i++) ES_set(i, 1);
+	else { // first run, start with every on/off option on (nothing is applied until B)
+		for (int i=0; i<ES_COUNT; i++) {
+			if (ES_max(i)==1) ES_set(i, 1);
+		}
 		enabled = 1;
 	}
 
@@ -200,8 +213,12 @@ int main(int argc, char* argv[]) {
 			SDL_AtomicSet(&update_state, UPDATE_DOWNLOADING);
 			SDL_DetachThread(SDL_CreateThread(Update_downloadThread, "UpdateDownload", NULL));
 		}
-		else if (visible[selected]!=ROW_UPDATE && (PAD_justRepeated(BTN_LEFT) || PAD_justRepeated(BTN_RIGHT) || PAD_justPressed(BTN_A))) {
-			Row_toggle(visible[selected]);
+		else if (visible[selected]!=ROW_UPDATE && PAD_justRepeated(BTN_LEFT)) {
+			Row_change(visible[selected], -1);
+			dirty = 1;
+		}
+		else if (visible[selected]!=ROW_UPDATE && (PAD_justRepeated(BTN_RIGHT) || PAD_justPressed(BTN_A))) {
+			Row_change(visible[selected], +1);
 			dirty = 1;
 		}
 		else if (PAD_justPressed(BTN_B)) {
@@ -243,7 +260,7 @@ int main(int argc, char* argv[]) {
 
 			int on_update_row = visible[selected]==ROW_UPDATE;
 			if (show_setting && !GetHDMI()) GFX_blitHardwareHints(screen, show_setting);
-			else if (update!=UPDATE_DOWNLOADING) GFX_blitButtonGroup((char*[]){ "A",on_update_row?"INSTALL":"TOGGLE", NULL }, 0, screen, 0);
+			else if (update!=UPDATE_DOWNLOADING) GFX_blitButtonGroup((char*[]){ "A",on_update_row?"INSTALL":rows[visible[selected]].opt==ES_SAVE_INTERVAL?"CHANGE":"TOGGLE", NULL }, 0, screen, 0);
 			if (update!=UPDATE_DOWNLOADING) GFX_blitButtonGroup((char*[]){ "B","SAVE", NULL }, 1, screen, 1);
 
 			// rows
@@ -284,7 +301,7 @@ int main(int argc, char* argv[]) {
 				SDL_BlitSurface(text, NULL, screen, &(SDL_Rect){ox+SCALE1(OPTION_PADDING), y+SCALE1(1)});
 				SDL_FreeSurface(text);
 
-				char* value = i==ROW_UPDATE ? update_version : Row_get(i) ? "On" : "Off";
+				char* value = i==ROW_UPDATE ? update_version : Row_label(i);
 				text = TTF_RenderUTF8_Blended(font.tiny, value, muted && j!=selected ? COLOR_GRAY : COLOR_WHITE);
 				SDL_BlitSurface(text, NULL, screen, &(SDL_Rect){ox + mw - text->w - SCALE1(OPTION_PADDING), y+SCALE1(3)});
 				SDL_FreeSurface(text);

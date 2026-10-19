@@ -1,5 +1,5 @@
 diff --git a/workspace/all/minarch/ma_menu.c b/workspace/all/minarch/ma_menu.c
-index 85ca434..beb1e11 100644
+index 85ca434..7883fe5 100644
 --- a/workspace/all/minarch/ma_menu.c
 +++ b/workspace/all/minarch/ma_menu.c
 @@ -22,6 +22,7 @@
@@ -79,12 +79,13 @@ index 85ca434..beb1e11 100644
  	setOverclock(overclock);
  }
  
-@@ -1759,6 +1776,77 @@ void Menu_loadState(void) {
+@@ -1759,6 +1776,94 @@ void Menu_loadState(void) {
  		}
  	}
  }
-+// save to the current slot without opening the menu (sleep/power-off and low battery)
-+static int Menu_saveCurrentSlot(void) {
++// save to the current slot without opening the menu (sleep/power-off, low battery, save interval)
++// sync_preview: write the preview before returning, for when the device may power off right after
++static int Menu_saveCurrentSlot(int sync_preview) {
 +	Menu_updateState();
 +
 +	if (menu.total_discs) {
@@ -92,7 +93,6 @@ index 85ca434..beb1e11 100644
 +		putFile(menu.txt_path, disc_path + strlen(menu.base_path));
 +	}
 +
-+	// the device may power off right after this so write the preview synchronously
 +	if (menu.bitmap) { // in the menu, the game frame was captured on open
 +		SDL_RWops* rw = SDL_RWFromFile(menu.bmp_path, "wb");
 +		if (rw) IMG_SavePNG_RW(menu.bitmap, rw, 1);
@@ -106,7 +106,8 @@ index 85ca434..beb1e11 100644
 +		args->path = SDL_strdup(menu.bmp_path);
 +		SDL_WaitThread(screenshotsavethread, NULL);
 +		screenshotsavethread = NULL;
-+		save_screenshot_thread(args);
++		if (sync_preview) save_screenshot_thread(args);
++		else screenshotsavethread = SDL_CreateThread(save_screenshot_thread, "SaveScreenshotThread", args);
 +	}
 +	newScreenshot = 0;
 +
@@ -116,7 +117,7 @@ index 85ca434..beb1e11 100644
 +}
 +// sleep/power-off quicksave into the current slot instead of the hidden auto slot
 +static void Menu_quicksaveToSlot(void) {
-+	Menu_saveCurrentSlot();
++	Menu_saveCurrentSlot(1);
 +	putInt(ES_RESUME_SLOT_PATH, menu.slot);
 +}
 +// called every frame in game: save at 10% and 5% battery, then every 2 minutes until charging
@@ -148,16 +149,32 @@ index 85ca434..beb1e11 100644
 +	saved_charge = charge;
 +	saved_at = now;
 +	LOG_info("low battery (%i%%), saving to slot %i\n", charge, menu.slot);
-+	int success = Menu_saveCurrentSlot();
++	int success = Menu_saveCurrentSlot(1);
 +
 +	char msg[NOTIFICATION_MAX_MESSAGE];
 +	snprintf(msg, sizeof(msg), success ? "Low Battery - Saved to Slot %d" : "Low Battery - Save Failed", menu.slot + 1);
 +	Notification_push(NOTIFICATION_SAVE_STATE, msg, NULL);
 +}
++// called every frame in game: save to the current slot every Save Interval of play
++static uint32_t interval_saved_at = 0; // 0 restarts the interval, eg. after the menu
++void Menu_checkSaveInterval(void) {
++	int secs = ES_save_interval_secs[ES_get(ES_SAVE_INTERVAL)];
++	uint32_t now = SDL_GetTicks();
++	if (!secs || !interval_saved_at) {
++		interval_saved_at = now;
++		return;
++	}
++	if (now - interval_saved_at < (uint32_t)secs * 1000) return;
++	interval_saved_at = now;
++
++	if (RA_isHardcoreModeActive()) return;
++	LOG_info("save interval (%is), saving to slot %i\n", secs, menu.slot);
++	Menu_saveCurrentSlot(0); // quietly, a notification every few seconds would be noise
++}
  
  void Menu_loop(void) {
  
-@@ -1817,7 +1905,8 @@ void Menu_loop(void) {
+@@ -1817,7 +1922,8 @@ void Menu_loop(void) {
  		sprintf(disc_name, "Disc %i", menu.disc+1);
  	}
  		
@@ -167,7 +184,7 @@ index 85ca434..beb1e11 100644
  	Menu_initState();
  	
  	int status = STATUS_CONT; // TODO: no longer used?
-@@ -1825,6 +1914,8 @@ void Menu_loop(void) {
+@@ -1825,6 +1931,8 @@ void Menu_loop(void) {
  	int dirty = 1;
  	int ignore_menu = 0;
  	int menu_start = 0;
@@ -176,7 +193,7 @@ index 85ca434..beb1e11 100644
  	SDL_Surface* preview = SDL_CreateRGBSurface(SDL_SWSURFACE,DEVICE_WIDTH/2,DEVICE_HEIGHT/2,32,RGBA_MASK_8888); // TODO: retain until changed?
  
  	//set vid.blit to null for menu drawing no need for blitrender drawing
-@@ -1836,53 +1927,80 @@ void Menu_loop(void) {
+@@ -1836,53 +1944,80 @@ void Menu_loop(void) {
  
  		PAD_poll();
  		
@@ -267,7 +284,7 @@ index 85ca434..beb1e11 100644
  				case ITEM_CONT:
  				if (menu.total_discs && rom_disc!=menu.disc) {
  						status = STATUS_DISC;
-@@ -1931,7 +2049,13 @@ void Menu_loop(void) {
+@@ -1931,7 +2066,13 @@ void Menu_loop(void) {
  					}
  				}
  				break;
@@ -281,7 +298,7 @@ index 85ca434..beb1e11 100644
  					status = STATUS_QUIT;
  					show_menu = 0;
  					quit = 1; // TODO: tmp?
-@@ -1979,16 +2103,20 @@ void Menu_loop(void) {
+@@ -1979,16 +2120,20 @@ void Menu_loop(void) {
  			GFX_blitButtonGroup((char*[]){ "B","BACK", "A","OKAY", NULL }, 1, screen, 1);
  			
  			// list
@@ -306,7 +323,7 @@ index 85ca434..beb1e11 100644
  						GFX_blitPillDark(ASSET_WHITE_PILL, screen, &(SDL_Rect){
  							SCALE1(PADDING),
  							SCALE1(oy + PADDING),
-@@ -2003,13 +2131,13 @@ void Menu_loop(void) {
+@@ -2003,13 +2148,13 @@ void Menu_loop(void) {
  						SDL_FreeSurface(text);
  					}
  					
@@ -322,7 +339,7 @@ index 85ca434..beb1e11 100644
  						ow,
  						SCALE1(PILL_SIZE)
  					});
-@@ -2017,16 +2145,16 @@ void Menu_loop(void) {
+@@ -2017,16 +2162,16 @@ void Menu_loop(void) {
  			
  				
  				// text
@@ -342,7 +359,7 @@ index 85ca434..beb1e11 100644
  				#define WINDOW_RADIUS 4 // TODO: this logic belongs in blitRect?
  				#define PAGINATION_HEIGHT 6
  				// unscaled
-@@ -2072,6 +2200,41 @@ void Menu_loop(void) {
+@@ -2072,6 +2217,41 @@ void Menu_loop(void) {
  					else GFX_blitAsset(ASSET_DOT, NULL, screen, &(SDL_Rect){ox+SCALE1(i*15)+4,oy+SCALE1(2)});
  				}
  			}
@@ -384,23 +401,25 @@ index 85ca434..beb1e11 100644
  			GFX_flip(screen);
  			dirty=0;
  		} else {
-@@ -2083,6 +2246,7 @@ void Menu_loop(void) {
+@@ -2083,6 +2263,8 @@ void Menu_loop(void) {
  	
  	SDL_FreeSurface(preview);
  	if(menu.bitmap) SDL_FreeSurface(menu.bitmap);
 +	menu.bitmap = NULL; // Menu_quicksaveToSlot checks this to know if we're in the menu
++	interval_saved_at = 0; // time in the menu isn't play time
  	PAD_reset();
  
  	GFX_clearAll();
 diff --git a/workspace/all/minarch/ma_menu.h b/workspace/all/minarch/ma_menu.h
-index 749a81b..960b7f4 100644
+index 749a81b..2ac2348 100644
 --- a/workspace/all/minarch/ma_menu.h
 +++ b/workspace/all/minarch/ma_menu.h
-@@ -20,3 +20,4 @@ void Menu_initState(void);
+@@ -20,3 +20,5 @@ void Menu_initState(void);
  void Menu_loop(void);
  void Menu_setCoreVersionDesc(const char* version);
  void Menu_waitScreenshot(void);
 +void Menu_checkLowBattery(void);
++void Menu_checkSaveInterval(void);
 diff --git a/workspace/all/minarch/ma_saves.c b/workspace/all/minarch/ma_saves.c
 index 8fe053e..2b0c33b 100644
 --- a/workspace/all/minarch/ma_saves.c
@@ -431,14 +450,15 @@ index 8fe053e..2b0c33b 100644
  	state_slot = last_state_slot;
  	Rewind_on_state_change();
 diff --git a/workspace/all/minarch/minarch.c b/workspace/all/minarch/minarch.c
-index 82b5d4c..e3b722a 100644
+index 82b5d4c..51658fb 100644
 --- a/workspace/all/minarch/minarch.c
 +++ b/workspace/all/minarch/minarch.c
-@@ -269,6 +269,7 @@ int main(int argc , char* argv[]) {
+@@ -269,6 +269,8 @@ int main(int argc , char* argv[]) {
  		GFX_startFrame();
  
  		run_frame();
 +		Menu_checkLowBattery();
++		Menu_checkSaveInterval();
  		
  		// Process RetroAchievements for this frame
  		RA_doFrame();
