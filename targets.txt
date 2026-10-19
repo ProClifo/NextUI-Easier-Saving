@@ -1,0 +1,6 @@
+# NextUI builds the pak can be built against. The patched binaries only run on
+# the exact release they were built from, so each target is its own download.
+#
+# name                 repository                               ref        platforms
+nextui-v6.15.0         https://github.com/LoveRetro/NextUI.git  v6.15.0    tg5040 tg5050 h700
+pvaibhav-h700-rc11     https://github.com/pvaibhav/NextUI.git   h700-rc11  h700
