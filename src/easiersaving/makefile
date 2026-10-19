@@ -1,0 +1,42 @@
+###########################################################
+# Built from inside a NextUI checkout: scripts/build.sh copies this folder to
+# workspace/all/easiersaving/ (and easiersaving.h to workspace/all/common/).
+
+ifeq (,$(PLATFORM))
+PLATFORM=$(UNION_PLATFORM)
+endif
+
+ifeq (,$(PLATFORM))
+	$(error please specify PLATFORM, eg. PLATFORM=tg5040 make)
+endif
+
+ifeq (,$(CROSS_COMPILE))
+	$(error missing CROSS_COMPILE for this toolchain)
+endif
+
+###########################################################
+
+include ../../$(PLATFORM)/platform/makefile.env
+SDL?=SDL
+
+###########################################################
+
+TARGET = easiersaving
+INCDIR = -I. -I../common/ -I../../$(PLATFORM)/platform/
+SOURCE = $(TARGET).c ../common/utils.c ../common/api.c ../common/config.c ../common/scaler.c ../../$(PLATFORM)/platform/platform.c
+
+CC = $(CROSS_COMPILE)gcc
+CFLAGS  += $(OPT)
+CFLAGS  += $(INCDIR) -DPLATFORM=\"$(PLATFORM)\" -std=gnu99
+LDFLAGS	 += -lmsettings
+
+PRODUCT= build/$(PLATFORM)/$(TARGET).elf
+
+all: $(PREFIX_LOCAL)/include/msettings.h
+	mkdir -p build/$(PLATFORM)
+	$(CC) $(SOURCE) -o $(PRODUCT) $(CFLAGS) $(LDFLAGS)
+clean:
+	rm -f $(PRODUCT)
+
+$(PREFIX_LOCAL)/include/msettings.h:
+	cd ../../$(PLATFORM)/libmsettings && make
