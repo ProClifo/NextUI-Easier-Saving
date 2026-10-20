@@ -1,21 +1,25 @@
 #!/bin/sh
-# Builds the patched NextUI binaries plus the settings tool and assembles the
-# pak for each platform, each from the NextUI source listed in sources.txt.
+# Builds the patched minarch and launcher plus the settings tool and
+# assembles the pak for each target in sources.txt (NextUI or MinUI).
 #
-# usage: scripts/build.sh [platform...]   (default: every platform in sources.txt)
+# usage: scripts/build.sh [target...]
+#   target: <os>-<platform> from sources.txt, eg. nextui-tg5040 or minui-miyoomini
+#           (default: every target in sources.txt)
 #
 # PAK_VERSION sets the version the pak reports and compares against releases
 # when it checks for updates (default: dev-<commit>, older than any release).
 #
-# Needs git, docker (or podman) and network access to pull NextUI, its
-# dependencies and the ghcr.io/loveretro/<platform>-toolchain images.
-# Output: dist/Easier Saving.zip, extract it to the root of the SD card.
+# Needs git, docker (or podman) and network access. NextUI targets use the
+# ghcr.io/loveretro/<platform>-toolchain images; MinUI targets build their
+# toolchain image from github.com/shauninman/union-<platform>-toolchain.
+# Output: dist/Easier Saving (NextUI).zip and/or dist/Easier Saving (MinUI).zip,
+# extract to the root of the SD card.
 
 set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCES="$ROOT/sources.txt"
-PLATFORMS="${*:-$(grep -v '^#' "$SOURCES" | awk 'NF {print $1}' | xargs)}"
+TARGETS="${*:-$(grep -v '^#' "$SOURCES" | awk 'NF {print $1 "-" $2}' | xargs)}"
 BUILD="$ROOT/build"
 DIST="$ROOT/dist"
 STAGE="$BUILD/stage"
@@ -34,52 +38,74 @@ if [ ! -f "$BUILD/cacert.pem" ]; then
 	curl -fsSL https://curl.se/ca/cacert.pem -o "$BUILD/cacert.pem"
 fi
 
-for platform in $PLATFORMS; do
-	LINE="$(awk -v p="$platform" '$1==p' "$SOURCES")"
-	[ -n "$LINE" ] || { echo "no source for $platform in sources.txt" >&2; exit 1; }
-	NEXTUI_REPO="$(echo "$LINE" | awk '{print $2}')"
-	NEXTUI_TAG="$(echo "$LINE" | awk '{print $3}')"
-	echo "== $platform: $NEXTUI_REPO $NEXTUI_TAG"
+for target in $TARGETS; do
+	os="${target%%-*}"
+	platform="${target#*-}"
+	LINE="$(awk -v o="$os" -v p="$platform" '$1==o && $2==p' "$SOURCES")"
+	[ -n "$LINE" ] || { echo "no $target in sources.txt" >&2; exit 1; }
+	REPO="$(echo "$LINE" | awk '{print $3}')"
+	TAG="$(echo "$LINE" | awk '{print $4}')"
+	echo "== $target: $REPO $TAG"
 
-	# pristine NextUI checkout at the pinned release
-	SRC="$BUILD/src-$(echo "$NEXTUI_REPO" | tr -c 'A-Za-z0-9' '-')$NEXTUI_TAG"
+	# pristine checkout at the pinned release
+	SRC="$BUILD/src-$(echo "$REPO" | tr -c 'A-Za-z0-9' '-')$TAG"
 	if [ ! -d "$SRC" ]; then
-		git clone --depth 1 --branch "$NEXTUI_TAG" "$NEXTUI_REPO" "$SRC"
+		git clone --depth 1 --branch "$TAG" "$REPO" "$SRC"
 	fi
 	COMMIT="$(git -C "$SRC" rev-parse HEAD)"
 
-	# one tree per platform, minarch's bundled deps don't rebuild cleanly across toolchains
-	WS="$BUILD/$platform"
+	# one tree per target, minarch's bundled deps don't rebuild cleanly across toolchains
+	WS="$BUILD/$target"
 	rm -rf "$WS"
 	cp -R "$SRC" "$WS"
-	git -C "$WS" apply "$ROOT/patches/easier-saving.patch"
+	git -C "$WS" apply "$ROOT/patches/$os.patch"
 	cp "$ROOT/src/common/easiersaving.h" "$WS/workspace/all/common/"
 	cp -R "$ROOT/src/easiersaving" "$WS/workspace/all/"
-	# same short hash stock NextUI reports in minarch's Options > Core
+	# same short hash the stock build reports in minarch's Options
 	git -C "$WS" rev-parse --short HEAD > "$WS/workspace/hash.txt"
+
+	if [ "$os" = "nextui" ]; then
+		IMAGE="ghcr.io/loveretro/$platform-toolchain:latest"
+		LAUNCHER=nextui
+		MAKE_TOOL="make -C ./all/easiersaving"
+	else
+		IMAGE="minui-$platform-toolchain"
+		LAUNCHER=minui
+		MAKE_TOOL="make -C ./all/easiersaving -f makefile.minui"
+		if ! "$RUNTIME" image inspect "$IMAGE" >/dev/null 2>&1; then
+			TC="$BUILD/toolchains/$platform"
+			[ -d "$TC" ] || git clone --depth 1 "https://github.com/shauninman/union-$platform-toolchain.git" "$TC"
+			"$RUNTIME" build -t "$IMAGE" "$TC"
+		fi
+	fi
 
 	"$RUNTIME" run --rm \
 		-v "$WS/workspace":/root/workspace \
 		-e PLATFORM="$platform" -e UNION_PLATFORM="$platform" \
-		"ghcr.io/loveretro/$platform-toolchain:latest" \
+		"$IMAGE" \
 		/bin/bash -c ". ~/.bashrc && export PLATFORM=$platform UNION_PLATFORM=$platform && cd /root/workspace \
 			&& make -C ./$platform/libmsettings \
-			&& make -C ./all/nextui \
+			&& make -C ./all/$LAUNCHER \
 			&& make -C ./all/minarch \
-			&& make -C ./all/easiersaving"
+			&& $MAKE_TOOL"
 
-	PAK="$STAGE/Tools/$platform/$PAK_NAME"
+	PAK="$STAGE/$os/Tools/$platform/$PAK_NAME"
 	mkdir -p "$PAK/bin/$platform"
 	cp "$ROOT/pak/$PAK_NAME/launch.sh" "$ROOT/pak/$PAK_NAME/apply.sh" "$ROOT/pak/$PAK_NAME/update.sh" "$BUILD/cacert.pem" "$PAK/"
+	echo "$os" > "$PAK/os.txt"
 	echo "$PAK_VERSION" > "$PAK/version.txt"
-	echo "$NEXTUI_TAG" > "$PAK/nextui-version.txt"
+	echo "$TAG" > "$PAK/nextui-version.txt"
 	echo "$COMMIT" > "$PAK/nextui-commit.txt"
 	cp "$WS/workspace/all/minarch/build/$platform/minarch.elf" \
-	   "$WS/workspace/all/nextui/build/$platform/nextui.elf" \
+	   "$WS/workspace/all/$LAUNCHER/build/$platform/$LAUNCHER.elf" \
 	   "$WS/workspace/all/easiersaving/build/$platform/easiersaving.elf" \
 	   "$PAK/bin/$platform/"
 	chmod +x "$PAK"/*.sh "$PAK/bin/$platform"/*.elf
 done
 
-(cd "$STAGE" && zip -r -X "$DIST/Easier Saving.zip" Tools)
-echo "built $DIST/Easier Saving.zip"
+for os in nextui minui; do
+	[ -d "$STAGE/$os" ] || continue
+	name="NextUI"; [ "$os" = "minui" ] && name="MinUI"
+	(cd "$STAGE/$os" && zip -r -X "$DIST/Easier Saving ($name).zip" Tools)
+	echo "built $DIST/Easier Saving ($name).zip"
+done

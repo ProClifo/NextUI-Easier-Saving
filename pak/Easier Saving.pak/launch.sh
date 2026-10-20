@@ -16,9 +16,11 @@ main() {
 		exit 1
 	fi
 
+	OS_NAME="NextUI"
+	[ "$(cat ./os.txt 2>/dev/null)" = "minui" ] && OS_NAME="MinUI"
 	NOTICE=""
 	if ! sh ./apply.sh check; then
-		NOTICE="Needs NextUI $(cat ./nextui-version.txt)"
+		NOTICE="Needs $OS_NAME $(cat ./nextui-version.txt)"
 	fi
 
 	"$BIN_DIR/easiersaving.elf" "$NOTICE" >> "$LOG" 2>&1

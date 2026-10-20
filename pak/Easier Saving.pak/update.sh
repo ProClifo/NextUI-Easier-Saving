@@ -5,7 +5,7 @@
 #   check:    prints one line, one of
 #               none                      up to date (or offline)
 #               available <version>       a newer release can be installed
-#               incompatible <version>    a newer release exists but needs another NextUI
+#               incompatible <version>    a newer release exists but needs another NextUI/MinUI
 #               error <message>
 #   download: fetches and verifies the newest release for this platform into
 #             .update/ inside the pak, prints "ready" or "error <message>"
@@ -14,7 +14,8 @@
 #
 # Each release carries latest.txt:
 #   version <tag>
-#   <platform> <sha256 of easier-saving-<platform>.tar.gz> <NextUI commit it was built from>
+#   <os>-<platform> <sha256 of easier-saving-<os>-<platform>.tar.gz> <commit of the OS it was built for>
+# where <os> is nextui or minui (os.txt in the pak), since both have a tg5040 build
 
 PAK_DIR="$(cd "$(dirname "$0")" && pwd)"
 ES_DIR="$SHARED_USERDATA_PATH/.easiersaving"
@@ -22,6 +23,8 @@ REPO="ProClifo/NextUI-Easier-Saving"
 BASE="${ES_UPDATE_BASE:-https://github.com/$REPO/releases/latest/download}" # override for testing
 STAGE="$PAK_DIR/.update"
 MANIFEST="/tmp/easiersaving-latest.txt"
+OS="$(cat "$PAK_DIR/os.txt" 2>/dev/null)"
+TARGET="${OS:-nextui}-$PLATFORM"
 TARBALL="/tmp/easiersaving-update.tar.gz"
 
 # verify HTTPS against the CA bundle shipped with the pak, never fall back to -k
@@ -47,12 +50,12 @@ is_newer() {
 	}'
 }
 
-# the manifest line for this platform: <platform> <sha256> <commit>
+# the manifest line for this device: <os>-<platform> <sha256> <commit>
 platform_line() {
-	awk -v p="$PLATFORM" '$1==p' "$MANIFEST"
+	awk -v t="$TARGET" '$1==t' "$MANIFEST"
 }
 
-# whether a release built from NextUI commit $1 runs on the installed NextUI (see apply.sh)
+# whether a release built from OS commit $1 runs on the installed NextUI/MinUI (see apply.sh)
 matches_nextui() {
 	[ -f "$ES_DIR/skip-version-check" ] && return 0
 	actual="$(sed -n 2p "$SDCARD_PATH/.system/version.txt" 2>/dev/null | tr -d '\r\n ')"
@@ -72,7 +75,7 @@ check() {
 	[ "$(is_newer "$latest" "$installed")" = 1 ] || { echo "none"; return; }
 
 	line="$(platform_line)"
-	[ -n "$line" ] || { echo "error no $PLATFORM build in $latest"; return; }
+	[ -n "$line" ] || { echo "error no $TARGET build in $latest"; return; }
 	if matches_nextui "$(echo "$line" | awk '{print $3}')"; then
 		echo "available $latest"
 	else
@@ -83,11 +86,11 @@ check() {
 download() {
 	fetch "$BASE/latest.txt" "$MANIFEST" 15 || { echo "error can't reach GitHub"; return; }
 	line="$(platform_line)"
-	[ -n "$line" ] || { echo "error no $PLATFORM build"; return; }
+	[ -n "$line" ] || { echo "error no $TARGET build"; return; }
 	sha="$(echo "$line" | awk '{print $2}')"
 
 	rm -f "$TARBALL"
-	fetch "$BASE/easier-saving-$PLATFORM.tar.gz" "$TARBALL" 300 || { echo "error download failed"; return; }
+	fetch "$BASE/easier-saving-$TARGET.tar.gz" "$TARBALL" 300 || { echo "error download failed"; return; }
 	if command -v sha256sum >/dev/null 2>&1; then
 		echo "$sha  $TARBALL" | sha256sum -c - >/dev/null 2>&1 || { rm -f "$TARBALL"; echo "error checksum mismatch"; return; }
 	fi

@@ -1,7 +1,19 @@
-# Which NextUI each platform is built against. The patched binaries only run
-# on the exact release they were built from.
+# Which OS release each device is built against. The patched binaries only
+# run on the exact release they were built from.
 #
-# platform  repository                               ref
-tg5040      https://github.com/LoveRetro/NextUI.git  v6.15.0
-tg5050      https://github.com/LoveRetro/NextUI.git  v6.15.0
-h700        https://github.com/LoveRetro/NextUI.git  v6.15.0
+# os      platform     repository                                ref
+nextui    tg5040       https://github.com/LoveRetro/NextUI.git   v6.15.0
+nextui    tg5050       https://github.com/LoveRetro/NextUI.git   v6.15.0
+nextui    h700         https://github.com/LoveRetro/NextUI.git   v6.15.0
+minui     miyoomini    https://github.com/shauninman/MinUI.git   v20251127-1
+minui     trimuismart  https://github.com/shauninman/MinUI.git   v20251127-1
+minui     rg35xx       https://github.com/shauninman/MinUI.git   v20251127-1
+minui     rg35xxplus   https://github.com/shauninman/MinUI.git   v20251127-1
+minui     my355        https://github.com/shauninman/MinUI.git   v20251127-1
+minui     tg5040       https://github.com/shauninman/MinUI.git   v20251127-1
+minui     zero28       https://github.com/shauninman/MinUI.git   v20251127-1
+minui     rgb30        https://github.com/shauninman/MinUI.git   v20251127-1
+minui     m17          https://github.com/shauninman/MinUI.git   v20251127-1
+minui     gkdpixel     https://github.com/shauninman/MinUI.git   v20251127-1
+minui     my282        https://github.com/shauninman/MinUI.git   v20251127-1
+minui     magicmini    https://github.com/shauninman/MinUI.git   v20251127-1

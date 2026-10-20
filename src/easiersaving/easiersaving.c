@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <msettings.h>
 
 #include "defines.h"
@@ -25,6 +26,22 @@
 #define EXIT_INSTALL_UPDATE 3
 
 #define OPTION_PADDING 8
+
+// the same source builds against NextUI and MinUI (-DES_MINUI), which draw
+// lists differently: NextUI uses theme colored pills, MinUI gray/white pills
+#ifdef ES_MINUI
+static void Pill_title(SDL_Surface* dst, SDL_Rect* rect)    { GFX_blitPill(ASSET_BLACK_PILL, dst, rect); }
+static void Pill_row(SDL_Surface* dst, SDL_Rect* rect)      { GFX_blitPill(ASSET_OPTION, dst, rect); }
+static void Pill_selected(SDL_Surface* dst, SDL_Rect* rect) { GFX_blitPill(ASSET_BUTTON, dst, rect); }
+#define COLOR_TITLE    COLOR_WHITE
+#define COLOR_SELECTED COLOR_BLACK
+#else
+static void Pill_title(SDL_Surface* dst, SDL_Rect* rect)    { GFX_blitPillLight(ASSET_WHITE_PILL, dst, rect); }
+static void Pill_row(SDL_Surface* dst, SDL_Rect* rect)      { GFX_blitPillLight(ASSET_BUTTON, dst, rect); }
+static void Pill_selected(SDL_Surface* dst, SDL_Rect* rect) { GFX_blitPillDark(ASSET_BUTTON, dst, rect); }
+#define COLOR_TITLE    uintToColour(THEME_COLOR6_255)
+#define COLOR_SELECTED uintToColour(THEME_COLOR5_255)
+#endif
 
 enum {
 	ROW_UPDATE, // only listed when an update can be installed
@@ -89,7 +106,15 @@ enum {
 	UPDATE_FAILED,
 };
 
-static SDL_atomic_t update_state;
+// written by the background thread, read every frame
+static volatile int update_state;
+static int Update_getState(void) { return __atomic_load_n(&update_state, __ATOMIC_SEQ_CST); }
+static void Update_setState(int state) { __atomic_store_n(&update_state, state, __ATOMIC_SEQ_CST); }
+static void Update_start(void* (*fn)(void*)) {
+	pthread_t thread;
+	if (pthread_create(&thread, NULL, fn, NULL)==0) pthread_detach(thread);
+	else Update_setState(UPDATE_NONE);
+}
 static char update_version[32];
 static char update_error[128];
 
@@ -103,7 +128,7 @@ static void Update_run(const char* command, char* out, int size) {
 	if (fgets(out, size, pipe)) out[strcspn(out, "\r\n")] = '\0';
 	pclose(pipe);
 }
-static int Update_checkThread(void* unused) {
+static void* Update_checkThread(void* unused) {
 	char line[160];
 	Update_run("check", line, sizeof(line));
 	int state = UPDATE_NONE;
@@ -111,21 +136,21 @@ static int Update_checkThread(void* unused) {
 	else if (!strncmp(line, "incompatible ", 13)) state = UPDATE_INCOMPATIBLE;
 	if (state!=UPDATE_NONE) snprintf(update_version, sizeof(update_version), "%s", strchr(line, ' ')+1);
 	else if (line[0]) LOG_info("update check: %s\n", line);
-	SDL_AtomicSet(&update_state, state);
-	return 0;
+	Update_setState(state);
+	return NULL;
 }
-static int Update_downloadThread(void* unused) {
+static void* Update_downloadThread(void* unused) {
 	char line[160];
 	Update_run("download", line, sizeof(line));
 	if (!strcmp(line, "ready")) {
-		SDL_AtomicSet(&update_state, UPDATE_READY);
+		Update_setState(UPDATE_READY);
 	}
 	else {
 		snprintf(update_error, sizeof(update_error), "Update failed: %s", line[0] ? (strncmp(line, "error ", 6) ? line : line+6) : "unknown error");
 		LOG_info("%s\n", update_error);
-		SDL_AtomicSet(&update_state, UPDATE_FAILED);
+		Update_setState(UPDATE_FAILED);
 	}
-	return 0;
+	return NULL;
 }
 
 int main(int argc, char* argv[]) {
@@ -135,6 +160,10 @@ int main(int argc, char* argv[]) {
 	getFile("./version.txt", version, sizeof(version));
 	version[strcspn(version, "\r\n")] = '\0';
 	char title_buf[128];
+
+	char os[16] = "";
+	getFile("./os.txt", os, sizeof(os));
+	char* os_name = !strncmp(os, "minui", 5) ? "MinUI" : "NextUI";
 
 	PWR_setCPUSpeed(CPU_SPEED_MENU);
 
@@ -161,8 +190,8 @@ int main(int argc, char* argv[]) {
 	int start = 0; // first visible row, the list scrolls on short screens
 	int install_update = 0;
 
-	SDL_AtomicSet(&update_state, UPDATE_CHECKING);
-	SDL_DetachThread(SDL_CreateThread(Update_checkThread, "UpdateCheck", NULL));
+	Update_setState(UPDATE_CHECKING);
+	Update_start(Update_checkThread);
 	int last_update_state = UPDATE_CHECKING;
 
 	// rows actually shown, selected indexes into this
@@ -173,7 +202,7 @@ int main(int argc, char* argv[]) {
 		GFX_startFrame();
 		PAD_poll();
 
-		int update = SDL_AtomicGet(&update_state);
+		int update = Update_getState();
 		if (update!=last_update_state) {
 			// keep the same row selected when the update row comes or goes,
 			// unless the cursor is still on the first row, then point at the update
@@ -210,8 +239,8 @@ int main(int argc, char* argv[]) {
 			dirty = 1;
 		}
 		else if (visible[selected]==ROW_UPDATE && PAD_justPressed(BTN_A)) {
-			SDL_AtomicSet(&update_state, UPDATE_DOWNLOADING);
-			SDL_DetachThread(SDL_CreateThread(Update_downloadThread, "UpdateDownload", NULL));
+			Update_setState(UPDATE_DOWNLOADING);
+			Update_start(Update_downloadThread);
 		}
 		else if (visible[selected]!=ROW_UPDATE && PAD_justRepeated(BTN_LEFT)) {
 			Row_change(visible[selected], -1);
@@ -238,15 +267,15 @@ int main(int argc, char* argv[]) {
 			else if (update==UPDATE_CHECKING) title = "Checking for updates...";
 			else if (update==UPDATE_DOWNLOADING) snprintf(title_buf, sizeof(title_buf), "Downloading %s...", update_version);
 			else if (update==UPDATE_FAILED) title = update_error;
-			else if (update==UPDATE_INCOMPATIBLE) snprintf(title_buf, sizeof(title_buf), "%s needs a newer NextUI", update_version);
+			else if (update==UPDATE_INCOMPATIBLE) snprintf(title_buf, sizeof(title_buf), "%s needs a newer %s", update_version, os_name);
 			else if (version[0]) snprintf(title_buf, sizeof(title_buf), "Easier Saving %s", version);
 			else title = "Easier Saving";
 			int max_width = screen->w - SCALE1(PADDING * 2) - ow;
 			char display_name[256];
 			int text_width = GFX_truncateText(font.large, title, display_name, max_width, SCALE1(BUTTON_PADDING*2));
 			max_width = MIN(max_width, text_width);
-			SDL_Surface* text = TTF_RenderUTF8_Blended(font.large, display_name, uintToColour(THEME_COLOR6_255));
-			GFX_blitPillLight(ASSET_WHITE_PILL, screen, &(SDL_Rect){
+			SDL_Surface* text = TTF_RenderUTF8_Blended(font.large, display_name, COLOR_TITLE);
+			Pill_title(screen, &(SDL_Rect){
 				SCALE1(PADDING),
 				SCALE1(PADDING),
 				max_width,
@@ -286,13 +315,13 @@ int main(int argc, char* argv[]) {
 				int muted = i!=ROW_ENABLED && i!=ROW_UPDATE && !enabled;
 
 				if (j==selected) {
-					GFX_blitPillLight(ASSET_BUTTON, screen, &(SDL_Rect){ox, y, mw, SCALE1(BUTTON_SIZE)});
+					Pill_row(screen, &(SDL_Rect){ox, y, mw, SCALE1(BUTTON_SIZE)});
 
 					int w = 0;
 					TTF_SizeUTF8(font.small, rows[i].name, &w, NULL);
 					w += SCALE1(OPTION_PADDING*2);
-					GFX_blitPillDark(ASSET_BUTTON, screen, &(SDL_Rect){ox, y, w, SCALE1(BUTTON_SIZE)});
-					text_color = uintToColour(THEME_COLOR5_255);
+					Pill_selected(screen, &(SDL_Rect){ox, y, w, SCALE1(BUTTON_SIZE)});
+					text_color = COLOR_SELECTED;
 					desc = rows[i].desc;
 				}
 				else if (muted) text_color = COLOR_GRAY;

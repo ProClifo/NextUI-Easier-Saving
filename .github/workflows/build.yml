@@ -14,19 +14,34 @@ permissions:
 
 jobs:
   build:
-    # the NextUI toolchain images are arm64
-    runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         # keep in sync with sources.txt
-        platform: [tg5040, tg5050, h700]
+        # NextUI's toolchain images are arm64, MinUI's toolchains are built for x86_64
+        include:
+          - {target: nextui-tg5040, runner: ubuntu-24.04-arm}
+          - {target: nextui-tg5050, runner: ubuntu-24.04-arm}
+          - {target: nextui-h700, runner: ubuntu-24.04-arm}
+          - {target: minui-miyoomini, runner: ubuntu-24.04}
+          - {target: minui-trimuismart, runner: ubuntu-24.04}
+          - {target: minui-rg35xx, runner: ubuntu-24.04}
+          - {target: minui-rg35xxplus, runner: ubuntu-24.04}
+          - {target: minui-my355, runner: ubuntu-24.04}
+          - {target: minui-tg5040, runner: ubuntu-24.04}
+          - {target: minui-zero28, runner: ubuntu-24.04}
+          - {target: minui-rgb30, runner: ubuntu-24.04}
+          - {target: minui-m17, runner: ubuntu-24.04}
+          - {target: minui-gkdpixel, runner: ubuntu-24.04}
+          - {target: minui-my282, runner: ubuntu-24.04}
+          - {target: minui-magicmini, runner: ubuntu-24.04}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build ${{ matrix.platform }}
-        run: ./scripts/build.sh ${{ matrix.platform }}
+      - name: Build ${{ matrix.target }}
+        run: ./scripts/build.sh ${{ matrix.target }}
         env:
           # releases report their tag, everything else dev-<commit>
           PAK_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
@@ -34,11 +49,13 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: stage-${{ matrix.platform }}
+          name: stage-${{ matrix.target }}
           path: build/stage/
 
   package:
     needs: build
+    # package whatever built, a broken toolchain shouldn't hold back every other device
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     steps:
       - name: Download
@@ -52,37 +69,49 @@ jobs:
         run: |
           mkdir -p dist
           find stage -name '*.sh' -o -name '*.elf' | xargs -d '\n' chmod +x
-          (cd stage && zip -r -X "../dist/Easier Saving.zip" Tools)
+          [ -d stage/nextui ] && (cd stage/nextui && zip -r -X "../../dist/Easier Saving (NextUI).zip" Tools)
+          [ -d stage/minui ] && (cd stage/minui && zip -r -X "../../dist/Easier Saving (MinUI).zip" Tools)
+          ls -la dist
 
-      # what update.sh on the device downloads: one archive per platform plus
-      # latest.txt with each archive's checksum and the NextUI it was built for
+      # what update.sh on the device downloads: one archive per os/platform plus
+      # latest.txt with each archive's checksum and the OS commit it was built for
       - name: Update archives
         run: |
           set -e
           version=""
-          for pak in stage/Tools/*/"Easier Saving.pak"; do
+          for pak in stage/*/Tools/*/"Easier Saving.pak"; do
             platform="$(basename "$(dirname "$pak")")"
+            os="$(cat "$pak/os.txt")"
             version="$(cat "$pak/version.txt")"
-            tar -czf "dist/easier-saving-$platform.tar.gz" -C "$pak" .
-            sha="$(sha256sum "dist/easier-saving-$platform.tar.gz" | cut -d' ' -f1)"
-            echo "$platform $sha $(cat "$pak/nextui-commit.txt")" >> dist/platforms.txt
+            tar -czf "dist/easier-saving-$os-$platform.tar.gz" -C "$pak" .
+            sha="$(sha256sum "dist/easier-saving-$os-$platform.tar.gz" | cut -d' ' -f1)"
+            echo "$os-$platform $sha $(cat "$pak/nextui-commit.txt")" >> dist/platforms.txt
           done
           { echo "version $version"; cat dist/platforms.txt; } > dist/latest.txt
           rm dist/platforms.txt
           cat dist/latest.txt
 
-      - name: Upload
+      - name: Upload NextUI
         uses: actions/upload-artifact@v4
         with:
-          name: Easier Saving
-          path: dist/Easier Saving.zip
+          name: Easier Saving (NextUI)
+          path: dist/Easier Saving (NextUI).zip
+          if-no-files-found: ignore
+
+      - name: Upload MinUI
+        uses: actions/upload-artifact@v4
+        with:
+          name: Easier Saving (MinUI)
+          path: dist/Easier Saving (MinUI).zip
+          if-no-files-found: ignore
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/Easier Saving.zip
+            dist/Easier Saving (NextUI).zip
+            dist/Easier Saving (MinUI).zip
             dist/easier-saving-*.tar.gz
             dist/latest.txt
           generate_release_notes: true

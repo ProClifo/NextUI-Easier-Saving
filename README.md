@@ -1,6 +1,6 @@
 # Easier Saving
 
-A NextUI tool pak that makes saving simpler. Each change can be turned on or off on its own:
+A tool pak for [NextUI](https://github.com/LoveRetro/NextUI) and [MinUI](https://github.com/shauninman/MinUI) that makes saving simpler. Each change can be turned on or off on its own:
 
 | Option | What it does |
 |---|---|
@@ -44,7 +44,12 @@ Two things can still put a game somewhere other than where you left off. A **Res
 
 ## Install
 
-1. Download `Easier Saving.zip` from the [releases](../../releases), or from the latest **Build** workflow run. It's built for [NextUI](https://github.com/LoveRetro/NextUI) v6.15.0 on every supported device: `tg5040` (TrimUI Smart Pro / Brick), `tg5050` and `h700` (Anbernic).
+1. Download the zip for your OS from the [releases](../../releases), or from the latest **Build** workflow run:
+
+   | OS | Download | Devices |
+   |---|---|---|
+   | NextUI v6.15.0 | `Easier Saving (NextUI).zip` | `tg5040` (TrimUI Smart Pro / Brick), `tg5050`, `h700` (Anbernic) |
+   | MinUI v20251127-1 | `Easier Saving (MinUI).zip` | every MinUI device: `miyoomini`, `trimuismart`, `rg35xx`, `rg35xxplus`, `my355`, `tg5040`, `zero28`, `rgb30`, `m17`, `gkdpixel`, `my282`, `magicmini` |
 
 2. Extract it to the root of your SD card. This adds `Tools/<platform>/Easier Saving.pak`.
 3. On the device, open **Tools → Easier Saving**, set the options, then press **B** to save.
@@ -54,45 +59,53 @@ Two things can still put a game somewhere other than where you left off. A **Res
 Opening the pak checks GitHub for a newer release in the background ("Checking for updates..." in the title) when the device is on Wi-Fi. If there is one, an **Update Available** row shows up at the top of the list. Press **A** on it to download the update. The pak then installs it and restarts, keeping your settings.
 
 - Downloads come from this repo's [releases](../../releases) over HTTPS, verified against a CA bundle shipped in the pak, and are checked against the SHA-256 in the release's `latest.txt`.
-- An update built for a different NextUI release than the one installed isn't offered; the title shows *vX.Y.Z needs a newer NextUI* instead.
+- An update built for a different NextUI/MinUI release than the one installed isn't offered; the title shows *vX.Y.Z needs a newer NextUI* (or MinUI) instead.
+- Needs `curl` and Wi-Fi on the device. Most MinUI devices have neither, so there the check finds nothing and you update by copying the new zip over.
 - Without a connection the check quietly finds nothing.
 - Builds that don't come from a release (`dev-<commit>` in the title) always count as older than the latest release.
 
 ## How it works
 
-Changing NextUI's in-game menu needs a modified `minarch.elf`, and changing the game list needs a modified `nextui.elf`. This pak includes both, built from NextUI's own source with [`patches/easier-saving.patch`](patches/easier-saving.patch) applied.
+Changing the in-game menu needs a modified `minarch.elf`, and changing the game list needs a modified launcher (`nextui.elf` or `minui.elf`). This pak includes both, built from the OS's own source with [`patches/nextui.patch`](patches/nextui.patch) or [`patches/minui.patch`](patches/minui.patch) applied.
 
-- **Nothing in `.system` is overwritten.** The patched binaries are bind-mounted over the stock ones. A boot hook (`.userdata/<platform>/.hooks/boot.d/easier-saving.sync.sh`) redoes the mount on every boot.
-- **Turning the pak off** (the *Easier Saving* row) unmounts the binaries and removes the hook, so you get stock NextUI right away. Deleting the pak folder also gets you stock NextUI after the next reboot.
-- **Version-locked.** The binaries only work with the NextUI release they were built from (see [`sources.txt`](sources.txt)). If you run a different release, or update NextUI before this pak is rebuilt, it falls back to the stock binaries and the settings screen shows *Needs NextUI &lt;release&gt;*. To skip this check at your own risk, create `.userdata/shared/.easiersaving/skip-version-check`.
+- **Nothing in `.system` is overwritten.** The patched binaries are bind-mounted over the stock ones, and redone on every boot. On NextUI that's a boot hook (`.userdata/<platform>/.hooks/boot.d/easier-saving.sync.sh`). MinUI has no hooks, so the pak adds a clearly marked block to the top of `.userdata/<platform>/auto.sh`, keeping anything else you have in there.
+- **Turning the pak off** (the *Easier Saving* row) unmounts the binaries and removes the hook or `auto.sh` block, so you get the stock binaries back right away. Deleting the pak folder also gets you stock NextUI after the next reboot.
+- **Version-locked.** The binaries only work with the NextUI/MinUI release they were built from (see [`sources.txt`](sources.txt)). If you run a different release, or update NextUI before this pak is rebuilt, it falls back to the stock binaries and the settings screen shows *Needs NextUI &lt;release&gt;* (or MinUI). To skip this check at your own risk, create `.userdata/shared/.easiersaving/skip-version-check`.
 - With an option off, the patched binaries behave exactly like stock for that feature.
 
 Settings are stored in `.userdata/shared/.easiersaving/settings.txt`, and the log is in `.userdata/<platform>/logs/Easier Saving.txt`.
 
+### MinUI differences
+
+- **Low Battery Save** saves once the battery reaches its lowest reading, then every 2 minutes until charging. MinUI only reports the charge in rough steps, so there's no separate 10% and 5% save, and no on-screen notice, since MinUI has no notifications.
+- There's no RetroAchievements in MinUI, so nothing is skipped for Hardcore mode.
+
 ## Building
 
 ```sh
-./scripts/build.sh               # all platforms
-./scripts/build.sh h700          # just one
+./scripts/build.sh                      # every target in sources.txt
+./scripts/build.sh nextui-h700          # just one
+./scripts/build.sh minui-miyoomini
 ```
 
-The build needs `git` and `docker` (or `podman`). For each platform it clones the NextUI repository and tag listed in `sources.txt`, applies the patch, and compiles inside the official `ghcr.io/loveretro/<platform>-toolchain` images. The output is `dist/Easier Saving.zip`. The GitHub Actions workflow runs the same script on arm64 runners.
+The build needs `git` and `docker` (or `podman`). For each target it clones the repository and tag listed in `sources.txt` and applies that OS's patch. NextUI targets compile inside the official `ghcr.io/loveretro/<platform>-toolchain` images. MinUI targets first build their toolchain image from [`shauninman/union-<platform>-toolchain`](https://github.com/shauninman/union-miyoomini-toolchain). The output is `dist/Easier Saving (NextUI).zip` and/or `dist/Easier Saving (MinUI).zip`. The GitHub Actions workflow runs the same script, with NextUI on arm64 runners and MinUI on x86_64.
 
-Pushing a `v*` tag (eg. `v1.2.0`) publishes a release, and that release is what installed paks update to. Besides `Easier Saving.zip` it carries `easier-saving-<platform>.tar.gz` and `latest.txt`, which `update.sh` on the device reads. Set `PAK_VERSION` to give a local build a version.
+Pushing a `v*` tag (eg. `v1.2.0`) publishes a release, and that release is what installed paks update to. Besides the two zips it carries `easier-saving-<os>-<platform>.tar.gz` and `latest.txt`, which `update.sh` on the device reads. Set `PAK_VERSION` to give a local build a version.
 
-### Updating to a new NextUI release
+### Updating to a new NextUI or MinUI release
 
-1. Update the platform's line in `sources.txt` (and the matrix in `.github/workflows/build.yml` if you add a platform).
-2. Check that the patch still applies: `git -C <NextUI checkout> apply --check patches/easier-saving.patch`. If it doesn't, apply it by hand to the new tag and regenerate it with `git diff -- workspace/all/minarch workspace/all/nextui > patches/easier-saving.patch`.
+1. Update the target's line in `sources.txt` (and the matrix in `.github/workflows/build.yml` if you add a target).
+2. Check that the patch still applies: `git -C <checkout> apply --check patches/<os>.patch`. If it doesn't, apply it by hand to the new tag and regenerate it with `git diff -- workspace/all/minarch workspace/all/nextui > patches/nextui.patch` (or `workspace/all/minarch workspace/all/minui > patches/minui.patch`).
 3. Tag a new release.
 
 ### Layout
 
 ```
-sources.txt                    NextUI repo/tag each platform is built against
-patches/easier-saving.patch    changes to minarch (in-game menu, quicksave) and nextui (A resumes)
+sources.txt                    OS repo/tag each target is built against
+patches/nextui.patch           NextUI changes: minarch (in-game menu, saving) and nextui (A resumes)
+patches/minui.patch            the same for MinUI's minarch and minui
 src/common/easiersaving.h      option storage shared by the patched binaries and the settings tool
-src/easiersaving/              settings tool (easiersaving.elf)
+src/easiersaving/              settings tool (easiersaving.elf); makefile for NextUI, makefile.minui for MinUI
 pak/Easier Saving.pak/         launch.sh, apply.sh (mount/unmount, boot hook, version check), update.sh (self-update)
 scripts/build.sh               build + package
 ```
