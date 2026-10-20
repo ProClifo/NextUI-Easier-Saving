@@ -18,6 +18,7 @@ RUN apt-get -o Acquire::Check-Valid-Until=false -y update && apt-get -y install 
 	cpio \
 	file \
 	git \
+	locales \
 	patch \
 	perl \
 	python \
@@ -27,6 +28,8 @@ RUN apt-get -o Acquire::Check-Valid-Until=false -y update && apt-get -y install 
 	xz-utils \
   && rm -rf /var/lib/apt/lists/*
 RUN echo "ca_certificate = /root/cacert.pem" >> /etc/wgetrc
+# Buildroot's dependency check wants a UTF-8 locale for a toolchain with locales
+RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && locale-gen
 
 WORKDIR /root
 COPY support .
