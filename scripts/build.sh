@@ -11,7 +11,8 @@
 #
 # Needs git, docker (or podman) and network access. NextUI targets use the
 # ghcr.io/loveretro/<platform>-toolchain images; MinUI targets build their
-# toolchain image from github.com/shauninman/union-<platform>-toolchain.
+# toolchain image from github.com/shauninman/union-<platform>-toolchain
+# (or toolchains/<platform>/Dockerfile with that repo as context).
 # Output: dist/Easier Saving (NextUI).zip and/or dist/Easier Saving (MinUI).zip,
 # extract to the root of the SD card.
 
@@ -78,7 +79,13 @@ for target in $TARGETS; do
 		if ! "$RUNTIME" image inspect "$IMAGE" >/dev/null 2>&1; then
 			TC="$BUILD/toolchains/$platform"
 			[ -d "$TC" ] || git clone --depth 1 "https://github.com/shauninman/union-$platform-toolchain.git" "$TC"
-			"$RUNTIME" build -t "$IMAGE" "$TC"
+			# toolchains/<platform>/Dockerfile replaces one that no longer builds as is
+			DOCKERFILE="$TC/Dockerfile"
+			if [ -f "$ROOT/toolchains/$platform/Dockerfile" ]; then
+				DOCKERFILE="$ROOT/toolchains/$platform/Dockerfile"
+				cp "$BUILD/cacert.pem" "$TC/support/"
+			fi
+			"$RUNTIME" build -t "$IMAGE" -f "$DOCKERFILE" "$TC"
 		fi
 	fi
 

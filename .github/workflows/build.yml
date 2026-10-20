@@ -38,12 +38,12 @@ jobs:
           - {target: minui-m17, runner: ubuntu-24.04}
           - {target: minui-gkdpixel, runner: ubuntu-24.04}
           - {target: minui-my282, runner: ubuntu-24.04}
+          # builds its toolchain from source (toolchains/trimuismart), the slowest job
+          - {target: minui-trimuismart, runner: ubuntu-24.04}
           - {target: minui-my355, runner: ubuntu-24.04-arm}
           - {target: minui-tg5040, runner: ubuntu-24.04-arm}
           - {target: minui-zero28, runner: ubuntu-24.04-arm}
           - {target: minui-magicmini, runner: ubuntu-24.04-arm}
-          # minui-trimuismart: its toolchain only builds a 2016 Buildroot from
-          # source, which can no longer download its sources, so it's left out
     steps:
       - name: Checkout
         uses: actions/checkout@v4
