@@ -90,7 +90,7 @@ Settings are stored in `.userdata/shared/.easiersaving/settings.txt`, and the lo
 
 The build needs `git` and `docker` (or `podman`). For each target it clones the repository and tag listed in `sources.txt` and applies that OS's patch. NextUI targets compile inside the official `ghcr.io/loveretro/<platform>-toolchain` images. MinUI targets first build their toolchain image from [`shauninman/union-<platform>-toolchain`](https://github.com/shauninman/union-miyoomini-toolchain). The output is `dist/Easier Saving (NextUI).zip` and/or `dist/Easier Saving (MinUI).zip`. The GitHub Actions workflow runs the same script, with NextUI on arm64 runners and MinUI on x86_64.
 
-Pushing a `v*` tag (eg. `v1.2.0`) publishes a release, and that release is what installed paks update to. Besides the two zips it carries `easier-saving-<os>-<platform>.tar.gz` and `latest.txt`, which `update.sh` on the device reads. Set `PAK_VERSION` to give a local build a version.
+Pushing a `v*` tag (eg. `v1.2.0`), or running the **Build** workflow by hand with a version in its *release* field, publishes a release, and that release is what installed paks update to. Besides the two zips it carries `easier-saving-<os>-<platform>.tar.gz` and `latest.txt`, which `update.sh` on the device reads. Set `PAK_VERSION` to give a local build a version.
 
 ### Updating to a new NextUI or MinUI release
 

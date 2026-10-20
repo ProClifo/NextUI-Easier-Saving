@@ -7,7 +7,12 @@ on:
     branches: ["**"]
     tags: ["v*"]
   pull_request: {}
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Publish a release with this version (eg. v1.2.0), leave empty for a normal build"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -44,8 +49,8 @@ jobs:
       - name: Build ${{ matrix.target }}
         run: ./scripts/build.sh ${{ matrix.target }}
         env:
-          # releases report their tag, everything else dev-<commit>
-          PAK_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+          # releases report their version, everything else dev-<commit>
+          PAK_VERSION: ${{ inputs.release || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || '' }}
 
       - name: Upload
         uses: actions/upload-artifact@v4
@@ -111,10 +116,13 @@ jobs:
           path: dist/Easier Saving (MinUI).zip
           if-no-files-found: ignore
 
+      # a pushed v* tag, or a manual run with a release version (which creates the tag)
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.release || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           files: |
             dist/Easier Saving (NextUI).zip
             dist/Easier Saving (MinUI).zip
