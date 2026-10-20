@@ -24,24 +24,26 @@ jobs:
       fail-fast: false
       matrix:
         # keep in sync with sources.txt
-        # NextUI's toolchain images are arm64, MinUI's toolchains are built for x86_64
+        # NextUI's toolchain images are arm64
         include:
           - {target: nextui-tg5040, runner: ubuntu-24.04-arm}
           - {target: nextui-tg5050, runner: ubuntu-24.04-arm}
           - {target: nextui-h700, runner: ubuntu-24.04-arm}
-          # MinUI is on hold, uncomment to build it again
-          # - {target: minui-miyoomini, runner: ubuntu-24.04}
-          # - {target: minui-trimuismart, runner: ubuntu-24.04}
-          # - {target: minui-rg35xx, runner: ubuntu-24.04}
-          # - {target: minui-rg35xxplus, runner: ubuntu-24.04}
-          # - {target: minui-my355, runner: ubuntu-24.04}
-          # - {target: minui-tg5040, runner: ubuntu-24.04}
-          # - {target: minui-zero28, runner: ubuntu-24.04}
-          # - {target: minui-rgb30, runner: ubuntu-24.04}
-          # - {target: minui-m17, runner: ubuntu-24.04}
-          # - {target: minui-gkdpixel, runner: ubuntu-24.04}
-          # - {target: minui-my282, runner: ubuntu-24.04}
-          # - {target: minui-magicmini, runner: ubuntu-24.04}
+          # MinUI toolchains are x86_64 cross compilers, except these, which use
+          # Debian's native arm64 compiler
+          - {target: minui-miyoomini, runner: ubuntu-24.04}
+          - {target: minui-rg35xx, runner: ubuntu-24.04}
+          - {target: minui-rg35xxplus, runner: ubuntu-24.04}
+          - {target: minui-rgb30, runner: ubuntu-24.04}
+          - {target: minui-m17, runner: ubuntu-24.04}
+          - {target: minui-gkdpixel, runner: ubuntu-24.04}
+          - {target: minui-my282, runner: ubuntu-24.04}
+          - {target: minui-my355, runner: ubuntu-24.04-arm}
+          - {target: minui-tg5040, runner: ubuntu-24.04-arm}
+          - {target: minui-zero28, runner: ubuntu-24.04-arm}
+          - {target: minui-magicmini, runner: ubuntu-24.04-arm}
+          # minui-trimuismart: its toolchain only builds a 2016 Buildroot from
+          # source, which can no longer download its sources, so it's left out
     steps:
       - name: Checkout
         uses: actions/checkout@v4

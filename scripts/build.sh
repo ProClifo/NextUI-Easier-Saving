@@ -67,10 +67,13 @@ for target in $TARGETS; do
 	if [ "$os" = "nextui" ]; then
 		IMAGE="ghcr.io/loveretro/$platform-toolchain:latest"
 		LAUNCHER=nextui
+		MAKE_LIBS="make -C ./$platform/libmsettings"
 		MAKE_TOOL="make -C ./all/easiersaving"
 	else
 		IMAGE="minui-$platform-toolchain"
 		LAUNCHER=minui
+		# every platform lib, some platform.c need more than libmsettings (eg. my282's libmstick)
+		MAKE_LIBS="for lib in ./$platform/lib*/; do make -C \$lib || exit 1; done"
 		MAKE_TOOL="make -C ./all/easiersaving -f makefile.minui"
 		if ! "$RUNTIME" image inspect "$IMAGE" >/dev/null 2>&1; then
 			TC="$BUILD/toolchains/$platform"
@@ -84,7 +87,7 @@ for target in $TARGETS; do
 		-e PLATFORM="$platform" -e UNION_PLATFORM="$platform" \
 		"$IMAGE" \
 		/bin/bash -c ". ~/.bashrc && export PLATFORM=$platform UNION_PLATFORM=$platform && cd /root/workspace \
-			&& make -C ./$platform/libmsettings \
+			&& $MAKE_LIBS \
 			&& make -C ./all/$LAUNCHER \
 			&& make -C ./all/minarch \
 			&& $MAKE_TOOL"

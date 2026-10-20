@@ -6,6 +6,7 @@ nextui    tg5040       https://github.com/LoveRetro/NextUI.git   v6.15.0
 nextui    tg5050       https://github.com/LoveRetro/NextUI.git   v6.15.0
 nextui    h700         https://github.com/LoveRetro/NextUI.git   v6.15.0
 minui     miyoomini    https://github.com/shauninman/MinUI.git   v20251127-1
+# trimuismart isn't built, its toolchain can't be set up anymore (see the workflow)
 minui     trimuismart  https://github.com/shauninman/MinUI.git   v20251127-1
 minui     rg35xx       https://github.com/shauninman/MinUI.git   v20251127-1
 minui     rg35xxplus   https://github.com/shauninman/MinUI.git   v20251127-1
