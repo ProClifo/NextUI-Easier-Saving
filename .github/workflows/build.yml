@@ -86,6 +86,11 @@ jobs:
             tar -czf "dist/easier-saving-$os-$platform.tar.gz" -C "$pak" .
             sha="$(sha256sum "dist/easier-saving-$os-$platform.tar.gz" | cut -d' ' -f1)"
             echo "$os-$platform $sha $(cat "$pak/nextui-commit.txt")" >> dist/platforms.txt
+            # paks from before MinUI support look for plain <platform> entries
+            if [ "$os" = "nextui" ]; then
+              cp "dist/easier-saving-$os-$platform.tar.gz" "dist/easier-saving-$platform.tar.gz"
+              echo "$platform $sha $(cat "$pak/nextui-commit.txt")" >> dist/platforms.txt
+            fi
           done
           { echo "version $version"; cat dist/platforms.txt; } > dist/latest.txt
           rm dist/platforms.txt
