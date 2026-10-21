@@ -51,6 +51,8 @@ Two things can still put a game somewhere other than where you left off. A **Res
    | NextUI v6.15.0 | `Easier Saving (NextUI).zip` | `tg5040` (TrimUI Smart Pro / Brick), `tg5050`, `h700` (Anbernic) |
    | MinUI v20251127-1 | `Easier Saving (MinUI).zip` | `miyoomini`, `rg35xx`, `rg35xxplus`, `my355`, `tg5040`, `zero28`, `rgb30`, `m17`, `gkdpixel`, `my282`, `magicmini`. Not `trimuismart` (TrimUI Model S): its toolchain can no longer be set up. |
 
+   **Tested on:** Anbernic RG SP (NextUI `h700`). Other devices are built from the same source but haven't been confirmed yet. Reports are welcome.
+
 2. Extract it to the root of your SD card. This adds `Tools/<platform>/Easier Saving.pak`.
 3. On the device, open **Tools → Easier Saving**, set the options, then press **B** to save.
 
