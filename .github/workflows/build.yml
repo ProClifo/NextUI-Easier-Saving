@@ -51,6 +51,9 @@ jobs:
           path: build/stage/
 
   build-minui:
+    # only a few runners are free at a time, let NextUI have them first
+    needs: build-nextui
+    if: ${{ !cancelled() }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
