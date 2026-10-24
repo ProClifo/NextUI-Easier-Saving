@@ -49,14 +49,19 @@ is_compatible() {
 	return 1
 }
 
+# The mount table lists the resolved path, which isn't always the one we mounted:
+# on h700 /mnt/SDCARD is a link to /mnt/sdcard. Check both.
 is_mounted() {
-	grep -q " $1 " /proc/mounts
+	real="$(readlink -f "$1" 2>/dev/null)"
+	awk -v a="$1" -v b="${real:-$1}" '$2==a || $2==b { found=1 } END { exit !found }' /proc/mounts
 }
 
 mount_all() {
+	# start clean, this also clears mounts stacked up by older versions of this
+	# script and binaries left mounted from before an update
+	unmount_all
 	for bin in $BINARIES; do
 		target="$SYSTEM_PATH/bin/$bin"
-		is_mounted "$target" && continue
 		if [ ! -f "$BIN_DIR/$bin" ] || [ ! -f "$target" ]; then
 			log "missing $BIN_DIR/$bin or $target, not mounting"
 			continue
@@ -72,13 +77,30 @@ mount_all() {
 unmount_all() {
 	for bin in $BINARIES; do
 		target="$SYSTEM_PATH/bin/$bin"
-		is_mounted "$target" || continue
-		if umount "$target"; then
-			log "unmounted $bin"
-		else
-			log "failed to unmount $bin"
-		fi
+		# older versions could mount the same file several times over
+		tries=0
+		while is_mounted "$target" && [ $tries -lt 10 ]; do
+			umount "$target" || { log "failed to unmount $bin"; break; }
+			tries=$((tries + 1))
+		done
+		[ $tries -gt 0 ] && log "unmounted $bin"
 	done
+	return 0
+}
+
+# Older versions could fail to install an update when its binaries were still
+# mounted: everything else was copied (including version.txt) and the download
+# was left in .update. If that's what's there, finish the job; anything else
+# in .update is a leftover and goes.
+finish_update() {
+	[ -d "$PAK_DIR/.update" ] || return 0
+	staged="$(cat "$PAK_DIR/.update/version.txt" 2>/dev/null)"
+	if [ -n "$staged" ] && [ "$staged" = "$(cat "$PAK_DIR/version.txt" 2>/dev/null)" ]; then
+		log "finishing the update to $staged"
+		sh "$PAK_DIR/update.sh" install >> "$LOG_PATH" 2>&1 || log "couldn't finish the update to $staged"
+	else
+		rm -rf "$PAK_DIR/.update"
+	fi
 }
 
 # the pak path can contain spaces but never a single quote (the launchers can't open those)
@@ -139,6 +161,8 @@ if [ "$1" = "unmount" ]; then
 	unmount_all
 	exit 0
 fi
+
+finish_update
 
 if [ -f "$ES_DIR/enabled" ] && [ -d "$BIN_DIR" ]; then
 	install_boot

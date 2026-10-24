@@ -111,7 +111,25 @@ install() {
 	[ -f "$STAGE/launch.sh" ] || return 1
 	# the patched binaries may be bind mounted from this pak, let go of them first
 	sh "$PAK_DIR/apply.sh" unmount
-	cp -Rf "$STAGE/." "$PAK_DIR/" || return 1
+
+	# each file is copied next to its destination and then moved into place, and
+	# version.txt goes last, so a failure never leaves a pak that claims to be
+	# up to date with old files in it
+	failed=0
+	list="/tmp/easiersaving-update-files.txt"
+	(cd "$STAGE" && find . -type f ! -name version.txt) > "$list" || return 1
+	while read -r file; do
+		mkdir -p "$PAK_DIR/$(dirname "$file")"
+		if ! { cp -f "$STAGE/$file" "$PAK_DIR/$file.new" && mv -f "$PAK_DIR/$file.new" "$PAK_DIR/$file"; }; then
+			echo "couldn't install $file"
+			rm -f "$PAK_DIR/$file.new"
+			failed=1
+		fi
+	done < "$list"
+	rm -f "$list"
+	[ $failed = 0 ] || return 1
+
+	cp -f "$STAGE/version.txt" "$PAK_DIR/version.txt" || return 1
 	rm -rf "$STAGE"
 	sync
 	echo "updated to $(cat "$PAK_DIR/version.txt")"
